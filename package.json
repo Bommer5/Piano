@@ -1,0 +1,14 @@
+{
+  "name": "piano-coach",
+  "version": "1.0.0",
+  "description": "Application web pour apprendre le piano : détection des notes jouées (micro / MIDI), import de partitions, cours et doigtés.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test tests/unit/",
+    "test:e2e": "node tests/e2e/run.mjs",
+    "test:all": "npm test && npm run test:e2e"
+  },
+  "license": "MIT"
+}
