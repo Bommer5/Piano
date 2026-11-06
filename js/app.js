@@ -6,7 +6,7 @@ import { generateSongCourse, describePosition } from './core/coursegen.js';
 import { noteLabel, midiToName, nameToMidi, centsOff, midiToFreq } from './core/notes.js';
 import { estimateNotes } from './core/spectrum.js';
 import { PitchSmoother } from './core/onset.js';
-import { store, DEFAULT_SETTINGS } from './core/storage.js';
+import { store, DEFAULT_SETTINGS, localDate } from './core/storage.js';
 import { importScoreFile, importScoreText, SUPPORTED_FORMATS, exportSong } from './parsers/index.js';
 import { Trainer } from './ui/trainer.js';
 import { keyDiagram, PianoKeyboard } from './ui/keyboard.js';
@@ -106,7 +106,7 @@ function viewHome() {
   const last = Object.entries(prog).sort((a, b) => (b[1].last || 0) - (a[1].last || 0))[0];
   const lastSong = last && findSong(last[0]);
   const days = store.practiceDays();
-  const today = days[new Date().toISOString().slice(0, 10)] || 0;
+  const today = days[localDate()] || 0;
   const goal = settings.dailyGoalMin * 60;
   const dayIdx = Math.floor(Date.now() / 86400000);
   const songOfDay = SONGS[dayIdx % SONGS.length];
@@ -669,10 +669,19 @@ function recorderPanel() {
   }
   function start() {
     const bpm = Number(tempo.value) || 90;
-    rec = { notes: [], open: new Map(), t: performance.now() + (60000 / bpm) * 4, bpm };
+    rec = { notes: [], open: new Map(), t: 0, bpm };
+    // métronome planifié au fil de l'eau (s'arrête avec l'enregistrement)
+    let beat = 0;
     const ac = synth.audioContext();
-    for (let i = 0; i < 64; i++) synth.click(ac.currentTime + (i * 60) / bpm, i % 4 === 0);
-    rec.timer = setInterval(() => { status.textContent = rec.t > performance.now() ? 'Décompte…' : `⏺ ${(((performance.now() - rec.t) / 1000) | 0)} s`; }, 200);
+    const t0 = ac.currentTime + 0.05;
+    rec.t = performance.now() + 50 + (60000 / bpm) * 4;
+    rec.timer = setInterval(() => {
+      while (t0 + (beat * 60) / bpm < ac.currentTime + 0.2) {
+        synth.click(t0 + (beat * 60) / bpm, beat % 4 === 0);
+        beat++;
+      }
+      status.textContent = rec.t > performance.now() ? 'Décompte…' : `⏺ ${(((performance.now() - rec.t) / 1000) | 0)} s`;
+    }, 50);
     btn.textContent = '⏹ Arrêter';
     btn.classList.add('danger');
   }
@@ -682,7 +691,8 @@ function recorderPanel() {
     for (const [m] of rec.open) off(m);
     const spb = 60000 / rec.bpm;
     const q = (x) => Math.round(x * 4) / 4;
-    const notes = rec.notes.map((n) => ({ midi: n.midi, start: Math.max(0, q((n.t0 - rec.t) / spb)), dur: Math.max(0.25, q((n.t1 - n.t0) / spb)), hand: n.midi >= 60 ? 'R' : 'L' })).filter((n) => n.start >= 0);
+    // les notes jouées pendant le décompte (avant le temps 1) sont ignorées
+    const notes = rec.notes.filter((n) => n.t0 >= rec.t - spb * 0.25).map((n) => ({ midi: n.midi, start: Math.max(0, q((n.t0 - rec.t) / spb)), dur: Math.max(0.25, q((n.t1 - n.t0) / spb)), hand: n.midi >= 60 ? 'R' : 'L' }));
     btn.textContent = '⏺ Enregistrer';
     btn.classList.remove('danger');
     status.textContent = `${notes.length} notes enregistrées`;
@@ -707,7 +717,7 @@ function viewProgress() {
   d.setDate(d.getDate() - 29);
   const vals = [];
   for (let i = 0; i < 30; i++) {
-    const k = d.toISOString().slice(0, 10);
+    const k = localDate(d);
     vals.push([k, days[k] || 0]);
     d.setDate(d.getDate() + 1);
   }
@@ -763,7 +773,7 @@ function viewSettings() {
       chk('showFingers', 'Afficher les doigtés'), chk('showNoteNames', 'Afficher le nom des notes'), chk('showKeyboardLabels', 'Afficher les touches du clavier d’ordinateur sur le piano'),
     ])),
     section('Son', h('div', { class: 'settings' }, [
-      sel('instrument', synth.INSTRUMENT_LIST, 'Instrument'), num('volume', 'Volume', 0, 1, 0.05), chk('metronome', 'Métronome activé par défaut'), chk('countIn', 'Décompte d’une mesure en mode Tempo'),
+      sel('instrument', synth.INSTRUMENT_LIST, 'Instrument'), num('volume', 'Volume', 0, 1, 0.05), chk('metronome', 'Métronome activé par défaut'), chk('midiLocalSound', 'Son de l’app pour le clavier MIDI', 'Décoche si ton piano numérique produit déjà le son (évite le son en double).'), chk('countIn', 'Décompte d’une mesure en mode Tempo'),
       h('button', { class: 'btn', onclick: () => [60, 64, 67, 72].forEach((m, i) => synth.playNote(m, { when: synth.audioContext().currentTime + i * 0.2, dur: 0.6, instrument: s.instrument, velocity: 0.7 })) }, '🔊 Tester le son'),
     ])),
     section('Micro & détection', h('div', { class: 'settings' }, [

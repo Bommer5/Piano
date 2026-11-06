@@ -146,9 +146,9 @@ test('moteur : mode attente', () => {
   assert.equal(e.input(64).partial, true);
   assert.equal(e.input(67).type, 'finish');
   const sum = e.summary();
-  assert.equal(sum.hits, 3);
+  assert.equal(sum.hits, 4); // chaque note juste compte (accord Mi+Sol = 2)
   assert.equal(sum.wrong, 1);
-  assert.equal(sum.score, 75);
+  assert.equal(sum.score, 80);
 });
 
 test('moteur : tolérance d’octave', () => {
@@ -163,11 +163,12 @@ test('moteur : mode tempo (justesse + rythme + manquées)', () => {
   const s = prepareSong({ tempo: 60, tracks: { R: 'C4 D4 E4 F4' } });
   const e = new PracticeEngine(s, { mode: 'tempo' });
   assert.equal(e.input(60, 0.02).grade, 'perfect');
-  const r = e.input(62, 1.2);
+  const r = e.input(62, 1.3); // à 60 BPM : parfait ±0.1 s, bien ±0.2 s, ok ±0.35 s
   assert.equal(r.grade, 'ok');
-  assert.ok(r.delta > 0.19);
+  assert.ok(r.delta > 0.29);
   assert.equal(e.input(70, 2.0).type, 'wrong');
-  const missed = e.tick(3.5); // Mi (2 s) raté, Fa (3 s) toujours jouable ? fenêtre 0.28 -> raté aussi
+  assert.equal(e.input(64, 2.6).type, 'offtime'); // bonne note mais trop tard : pas une fausse note
+  const missed = e.tick(3.5); // Mi (2 s) raté, Fa (3 s) aussi
   assert.deepEqual(missed.map((n) => n.midi), [64, 65]);
   e.tick(10);
   assert.ok(e.finished);
@@ -175,6 +176,34 @@ test('moteur : mode tempo (justesse + rythme + manquées)', () => {
   assert.equal(sum.hits, 2);
   assert.equal(sum.misses, 2);
   assert.equal(sum.wrong, 1);
+});
+
+test('fenêtres de rythme proportionnelles au tempo', async () => {
+  const { judgeWindows } = await import('../../js/core/practice.js');
+  const slow = judgeWindows(2), fast = judgeWindows(0.3);
+  assert.ok(slow.perfect > fast.perfect);
+  assert.ok(fast.ok >= 0.1 && slow.ok <= 0.35);
+});
+
+test('transposition : armure et doigtés jouables', async () => {
+  const { transposeKey } = await import('../../js/core/song.js');
+  assert.equal(transposeKey(0, 2), 2); // Do -> Ré
+  assert.equal(transposeKey(0, 5), -1); // Do -> Fa
+  assert.equal(transposeKey(0, 1), -5); // Do -> Ré bémol
+  const s = prepareSong({ tracks: { R: 'C4:1:1 D4:1:2 E4:1:3' } });
+  const t = transposeSong(s, 1); // Do#: pouce sur touche noire -> doigté recalculé
+  assert.ok(t.notes.every((n) => n.finger >= 1 && n.finger <= 5));
+  assert.equal(t.keyFifths, -5);
+});
+
+test('renversements d’accords : doigtés corrects', () => {
+  assert.deepEqual(chordFingers([64, 67, 72]), [1, 2, 5]); // Mi-Sol-Do (1er renversement)
+  assert.deepEqual(chordFingers([67, 72, 76]), [1, 3, 5]); // Sol-Do-Mi (2e renversement)
+});
+
+test('date locale (pas UTC) pour la série de jours', async () => {
+  const { localDate } = await import('../../js/core/storage.js');
+  assert.equal(localDate(new Date(2026, 0, 5, 0, 30)), '2026-01-05');
 });
 
 test('moteur : intervalle de mesures', () => {

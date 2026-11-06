@@ -69,7 +69,7 @@ export class Trainer {
     const mCount = s.measureCount;
     this.el.loopFrom = h('input', { type: 'number', min: 1, max: mCount, value: Math.floor(o.from / s.beatsPerMeasure) + 1, class: 'num', onchange: () => this.updateLoop() });
     this.el.loopTo = h('input', { type: 'number', min: 1, max: mCount, value: Math.ceil(o.to / s.beatsPerMeasure - 1e-6), class: 'num', onchange: () => this.updateLoop() });
-    const check = (key, label, title) => h('label', { class: 'check', title }, [h('input', { type: 'checkbox', checked: !!o[key], onchange: (e) => this.setOpt(key, e.target.checked) }), label]);
+    const check = (key, label, title) => h('label', { class: 'check', title }, [h('input', { type: 'checkbox', 'data-opt': key, checked: !!o[key], onchange: (e) => this.setOpt(key, e.target.checked) }), label]);
 
     this.el.viewSel = h('select', { onchange: (e) => this.setOpt('view', e.target.value), 'aria-label': 'Affichage' }, [
       h('option', { value: 'both', selected: o.view === 'both' }, 'Portée + notes'),
@@ -84,7 +84,7 @@ export class Trainer {
         h('span', { class: 'field' }, ['Transposer ', h('button', { class: 'btn tiny', onclick: () => this.setOpt('transpose', o.transpose - 1) }, '−'), this.el.transpose, h('button', { class: 'btn tiny', onclick: () => this.setOpt('transpose', o.transpose + 1) }, '+')]),
         h('span', { class: 'field' }, ['Mesures ', this.el.loopFrom, ' à ', this.el.loopTo]),
         check('loop', 'Boucle', 'Répéter le passage choisi'),
-        check('progressive', 'Tempo progressif', 'Accélère de 5 % à chaque passage réussi (≥ 90 %)'),
+        check('progressive', 'Tempo progressif', 'Accélère de 5 % à chaque passage réussi (≥ 90 %), jusqu’au tempo écrit'),
         check('metronome', 'Métronome', 'Clic de métronome'),
         check('accompany', 'Jouer l\'autre main', "L'app joue la main que tu ne travailles pas (utilise un casque avec le micro)"),
         check('hint', 'Aide', 'Rejoue la note attendue après 3 erreurs'),
@@ -231,7 +231,10 @@ export class Trainer {
     };
     this.unsub.push(midiInput.on((e) => {
       if (e.type === 'devices') this.updateMidiStatus();
-      else onEvent(e);
+      else if (e.type === 'pedal') {
+        synth.setSustain(e.down);
+        this.el.midiStatus.classList.toggle('pedal', e.down);
+      } else onEvent(e);
     }));
     midiInput.init().then(() => this.updateMidiStatus()).catch(() => this.updateMidiStatus());
     this.unsub.push(computerKeyboard.on((e) => {
@@ -245,6 +248,8 @@ export class Trainer {
       if (computerKeyboard.isTyping(e)) return;
       if (e.code === 'Space') {
         e.preventDefault();
+        if (e.repeat) return;
+        document.activeElement?.blur?.();
         this.playing ? this.pause() : this.start();
       } else if (e.code === 'KeyR' && !e.ctrlKey && !e.metaKey) this.restart();
       else if (e.code === 'Escape') this.pause();
@@ -261,7 +266,7 @@ export class Trainer {
       this.el.midiStatus.textContent = 'MIDI : non supporté';
       this.el.midiStatus.title = 'Utilise Chrome ou Edge pour brancher un clavier MIDI';
     } else {
-      this.el.midiStatus.textContent = d.length ? `🎹 ${d[0]}` : 'MIDI : aucun clavier';
+      this.el.midiStatus.textContent = d.length ? `🎹 ${d.join(', ')}` : 'MIDI : aucun clavier';
       this.el.midiStatus.classList.toggle('muted', !d.length);
     }
   }
@@ -316,9 +321,16 @@ export class Trainer {
     if (this.opts.mode === 'wait') {
       const ev = this.engine.current;
       if (!ev || ev.midis.length < 2) return;
+      // l'accord ne peut être validé que par une attaque postérieure à son apparition (pas par la résonance du précédent)
+      if (this._chordEvent !== ev) {
+        this._chordEvent = ev;
+        this._chordSince = performance.now();
+      }
+      if (this.lastAttack < this._chordSince) return;
       expected = ev.midis.filter((m) => !this.engine.satisfied.has(m));
     } else {
-      const near = this.engine.events.filter((ev) => Math.abs(ev.start - this.beat) < 0.3 && ev.midis.length > 1);
+      const winBeats = this.engine.windows.ok / (60 / this.engine.opts.tempo);
+      const near = this.engine.events.filter((ev) => Math.abs(ev.start - this.beat) < winBeats && ev.midis.length > 1);
       expected = near.flatMap((ev) => ev.notes.filter((n) => !this.engine.judged.has(n.id)).map((n) => n.midi));
     }
     if (!expected.length) return;
@@ -329,7 +341,9 @@ export class Trainer {
   }
 
   noteOn(midi, source, velocity = 0.8) {
-    synth.playNote(midi, { velocity, dur: 4, instrument: this.settings.instrument, a4: this.settings.a4 });
+    // Un piano numérique produit déjà son propre son : on évite de le doubler (réglable)
+    const local = source !== 'midi' || this.settings.midiLocalSound !== false;
+    if (local) synth.playNote(midi, { velocity, dur: 8, instrument: this.settings.instrument, a4: this.settings.a4 });
     this.held.add(midi);
     this.keyboard.press(midi);
     if (this.opts.mode !== 'listen') {
@@ -344,9 +358,10 @@ export class Trainer {
     this.keyboard.release(midi);
   }
 
-  currentSongTime() {
-    // position en secondes depuis le début du passage, compensée de la latence
-    return (this.beat - this.from) * (60 / this.engine.opts.tempo) - (this.settings.latencyMs || 0) / 1000;
+  currentSongTime(latencyMs = 0) {
+    // position en secondes depuis le début du passage, compensée de la latence de la source
+    const beat = this.playing && this.opts.mode !== 'wait' ? this.clockBeat() : this.beat;
+    return (beat - this.from) * (60 / this.engine.opts.tempo) - latencyMs / 1000;
   }
 
   evaluate(midi, source) {
@@ -355,8 +370,14 @@ export class Trainer {
     const ev = this.engine.current;
     // Harmoniques mal reconnues au micro : on ne les compte pas comme fautes
     if (fromMic && this.opts.mode === 'wait' && ev && !ev.midis.includes(midi) && ev.midis.some((m) => [12, 19, 24].includes(midi - m))) return;
+    if (fromMic && this.opts.mode === 'tempo') {
+      const near = this.engine.events.filter((e) => Math.abs(e.start - this.beat) < 0.5).flatMap((e) => e.midis);
+      if (!near.includes(midi) && near.some((m) => [12, 19, 24].includes(midi - m))) return;
+    }
     if (fromMic) this.keyboard.flash(midi, 'pressed-flash');
-    const res = this.engine.input(midi, this.currentSongTime());
+    // La tolérance d'octave ne vaut que pour le micro (un clavier MIDI ne se trompe pas d'octave)
+    this.engine.opts.octaveTolerant = fromMic && this.settings.octaveTolerant;
+    const res = this.engine.input(midi, this.currentSongTime(fromMic ? this.settings.latencyMs || 0 : 0));
     if (res.type === 'hit' || res.type === 'advance' || res.type === 'finish') {
       this.keyboard.flash(midi, 'hit');
       if (res.grade) {
@@ -366,6 +387,7 @@ export class Trainer {
       } else if (res.type !== 'hit' || !res.partial) {
         this.say(`✓ ${noteLabel(midi, this.settings)}`, 'ok');
       }
+      if (res.octave) this.say(`Bonne note, mais mauvaise octave (${noteLabel(midi, this.settings)}) : regarde bien la portée !`, 'info');
       if (this.opts.mode === 'wait' && (res.type === 'advance' || res.type === 'finish')) {
         const done = this.engine.events[this.engine.index - 1];
         done.notes.forEach((n) => this.markNote(n.id, 'hit'));
@@ -613,8 +635,8 @@ export class Trainer {
 
     if (this.opts.loop && this.opts.autoRepeat !== false) {
       let msg = `Passage terminé : ${s.score} % ${'★'.repeat(s.stars)}`;
-      if (this.opts.progressive && s.score >= 90 && this.opts.tempoPct < 150) {
-        this.setOpt('tempoPct', Math.min(150, this.opts.tempoPct + 5));
+      if (this.opts.progressive && s.score >= 90 && this.opts.tempoPct < 100) {
+        this.setOpt('tempoPct', Math.min(100, this.opts.tempoPct + 5));
         msg += ` — tempo augmenté à ${this.opts.tempoPct} %`;
       }
       toast(msg);
@@ -646,7 +668,8 @@ export class Trainer {
       this.el.loopFrom.value = m;
       this.el.loopTo.value = m;
       this.opts.loop = true;
-      this.root.querySelectorAll('.check input')[0].checked = true;
+      this.root.querySelector('[data-opt="loop"]').checked = true;
+      this.roll.loop = { from: (m - 1) * this.song.beatsPerMeasure, to: m * this.song.beatsPerMeasure };
       this.setOpt('tempoPct', Math.max(40, this.opts.tempoPct - 20));
       this.updateLoop();
       dlg.close();
@@ -663,6 +686,7 @@ export class Trainer {
     window.removeEventListener('keydown', this._keys);
     document.removeEventListener('visibilitychange', this._vis);
     this.roll.destroy();
-    for (const m of this.held) synth.releaseNote(m);
+    synth.setSustain(false);
+    for (const m of this.held) synth.releaseNote(m, true);
   }
 }

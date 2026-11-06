@@ -6,7 +6,18 @@
 import { buildEvents, measureOf } from './song.js';
 import { pitchClass } from './notes.js';
 
-export const JUDGE = { perfect: 0.08, good: 0.16, ok: 0.28 }; // en secondes (± autour du temps attendu)
+// Fenêtres de jugement en fraction de temps, bornées en secondes (± autour du temps attendu).
+export const JUDGE_BEATS = { perfect: 0.1, good: 0.2, ok: 0.35 };
+export const JUDGE_LIMITS = { perfect: [0.05, 0.1], good: [0.1, 0.2], ok: [0.18, 0.35] };
+export function judgeWindows(secPerBeat) {
+  const w = {};
+  for (const k of Object.keys(JUDGE_BEATS)) {
+    const [lo, hi] = JUDGE_LIMITS[k];
+    w[k] = Math.max(lo, Math.min(hi, JUDGE_BEATS[k] * secPerBeat));
+  }
+  return w;
+}
+export const JUDGE = judgeWindows(0.5); // valeurs à 120 BPM (compatibilité)
 
 export class PracticeEngine {
   /**
@@ -22,6 +33,10 @@ export class PracticeEngine {
 
   get secPerBeat() {
     return 60 / this.opts.tempo;
+  }
+
+  get windows() {
+    return judgeWindows(this.secPerBeat);
   }
 
   reset() {
@@ -40,6 +55,11 @@ export class PracticeEngine {
   matches(played, expected) {
     if (played === expected) return true;
     return this.opts.octaveTolerant && pitchClass(played) === pitchClass(expected);
+  }
+
+  /** Bonne note mais mauvaise octave (acceptée en mode tolérant, signalée à l'élève). */
+  wrongOctave(played, expected) {
+    return played !== expected && pitchClass(played) === pitchClass(expected);
   }
 
   _error(midi, event) {
@@ -83,12 +103,14 @@ export class PracticeEngine {
       return { type: 'wrong', midi, expected: ev.midis };
     }
     this.satisfied.add(target);
+    this._hit(); // chaque note juste compte, comme chaque fausse note (score équilibré pour les accords)
+    const octave = this.wrongOctave(midi, target);
+    if (octave) this.stats.octaveWarnings = (this.stats.octaveWarnings || 0) + 1;
     if (this.satisfied.size >= ev.midis.length) {
-      this._hit();
       this.log.push({ type: 'hit', event: ev.index });
-      return this._advance(midi);
+      return { ...this._advance(midi), octave };
     }
-    return { type: 'hit', midi, expected: ev.midis, partial: true };
+    return { type: 'hit', midi, expected: ev.midis, partial: true, octave };
   }
 
   _advance(midi) {
@@ -113,6 +135,7 @@ export class PracticeEngine {
 
   _inputTempo(midi, timeSec) {
     const spb = this.secPerBeat;
+    const JUDGE = this.windows;
     // note attendue non jugée la plus proche dans la fenêtre
     let best = null, bestDelta = Infinity;
     for (const ev of this.events) {
@@ -129,7 +152,14 @@ export class PracticeEngine {
       }
     }
     if (!best) {
+      // Bonne note mais hors fenêtre : ce n'est pas une fausse note (elle sera comptée « ratée » par tick)
+      const late = this.events.some((e) => e.notes.some((n) => !this.judged.has(n.id) && this.matches(midi, n.midi) && Math.abs(timeSec - (e.start - this.opts.from) * spb) < 1.5));
+      if (late) {
+        this.log.push({ type: 'offtime', midi, t: timeSec });
+        return { type: 'offtime', midi };
+      }
       const ev = this.events.find((e) => Math.abs(timeSec - (e.start - this.opts.from) * spb) <= JUDGE.ok);
+      this.log.push({ type: 'wrong', midi, t: timeSec });
       this._error(midi, ev);
       return { type: 'wrong', midi, expected: ev ? ev.midis : [] };
     }
@@ -139,13 +169,14 @@ export class PracticeEngine {
     this.stats.timing.push(bestDelta);
     this.judged.set(best.n.id, grade);
     this._hit();
-    return { type: 'hit', midi, grade, delta: bestDelta, noteId: best.n.id };
+    return { type: 'hit', midi, grade, delta: bestDelta, noteId: best.n.id, octave: this.wrongOctave(midi, best.n.midi) };
   }
 
   /** Mode tempo : à appeler régulièrement, marque les notes manquées. Renvoie les notes manquées. */
   tick(timeSec) {
     if (this.opts.mode !== 'tempo' || this.finished) return [];
     const spb = this.secPerBeat;
+    const JUDGE = this.windows;
     const missed = [];
     for (const ev of this.events) {
       const evTime = (ev.start - this.opts.from) * spb;

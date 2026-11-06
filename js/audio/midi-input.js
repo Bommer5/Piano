@@ -60,7 +60,7 @@ export const KEY_CODES = {
 export class ComputerKeyboard {
   constructor() {
     this.base = 60;
-    this.down = new Set();
+    this.down = new Map(); // code -> midi joué (pour relâcher la bonne note après un changement d'octave)
     this.listeners = new Set();
     this.enabled = true;
     this.labels = {};
@@ -77,6 +77,7 @@ export class ComputerKeyboard {
   attach() {
     window.addEventListener('keydown', this._kd);
     window.addEventListener('keyup', this._ku);
+    window.addEventListener('blur', () => this.releaseAll());
     // Libellés selon la disposition réelle du clavier (AZERTY affichera Q, Z…)
     navigator.keyboard?.getLayoutMap?.().then((map) => {
       for (const code of Object.keys(KEY_CODES)) this.labels[code] = (map.get(code) || '').toUpperCase();
@@ -105,13 +106,19 @@ export class ComputerKeyboard {
     if (!(e.code in KEY_CODES)) return;
     e.preventDefault();
     if (this.down.has(e.code)) return;
-    this.down.add(e.code);
-    this.emit({ type: 'noteon', midi: this.base + KEY_CODES[e.code], velocity: 0.75, source: 'keyboard' });
+    const midi = this.base + KEY_CODES[e.code];
+    this.down.set(e.code, midi);
+    this.emit({ type: 'noteon', midi, velocity: 0.75, source: 'keyboard' });
   }
   keyup(e) {
-    if (!(e.code in KEY_CODES) || !this.down.has(e.code)) return;
+    if (!this.down.has(e.code)) return;
+    const midi = this.down.get(e.code);
     this.down.delete(e.code);
-    this.emit({ type: 'noteoff', midi: this.base + KEY_CODES[e.code], source: 'keyboard' });
+    this.emit({ type: 'noteoff', midi, source: 'keyboard' });
+  }
+  releaseAll() {
+    for (const [code, midi] of this.down) this.emit({ type: 'noteoff', midi, source: 'keyboard' });
+    this.down.clear();
   }
 }
 

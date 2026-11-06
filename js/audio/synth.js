@@ -93,8 +93,24 @@ export function playNote(midi, { when = 0, dur = 1, velocity = 0.8, instrument =
   return voice;
 }
 
+let sustain = false;
+const sustained = new Set();
+
+/** Pédale de sustain : les notes relâchées continuent de sonner tant qu'elle est enfoncée. */
+export function setSustain(down) {
+  sustain = down;
+  if (!down) {
+    for (const m of sustained) releaseNote(m, true);
+    sustained.clear();
+  }
+}
+
 /** Relâche une note tenue (clavier MIDI / souris). */
-export function releaseNote(midi) {
+export function releaseNote(midi, force = false) {
+  if (sustain && !force) {
+    sustained.add(midi);
+    return;
+  }
   const v = active.get(midi);
   if (!v || !ctx) return;
   const t = ctx.currentTime;

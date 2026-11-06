@@ -6,7 +6,7 @@
 //   silences               ex. « r:1 »
 //   « | » barres de mesure (ignorées, juste pour la lisibilité)
 // Durées en temps (noire = 1, croche = 0.5, blanche = 2, « 1/3 » pour un triolet…).
-import { nameToMidi, midiToName } from './notes.js';
+import { nameToMidi, midiToName, isBlack } from './notes.js';
 import { autoFingering } from './fingering.js';
 
 const EPS = 1e-6;
@@ -131,12 +131,26 @@ export function buildEvents(song, { hands = 'both', from = 0, to = Infinity } = 
   return groupByStart(notes).map((g, i) => ({ ...g, index: i, midis: [...new Set(g.notes.map((n) => n.midi))] }));
 }
 
+/** Nouvelle armure après transposition (on choisit l'enharmonie la plus simple, |fifths| <= 6). */
+export function transposeKey(fifths, semis) {
+  // une quinte = 7 demi-tons ; 7 * 7 = 49 ≡ 1 (mod 12) donc +1 demi-ton = +7 quintes
+  let f = (((fifths || 0) + 7 * semis) % 12 + 12) % 12;
+  if (f > 6) f -= 12;
+  return f;
+}
+
 export function transposeSong(song, semis) {
   if (!semis) return song;
   return prepareSong({
     ...song,
     tracks: undefined,
-    notes: song.notes.map((n) => ({ ...n, midi: n.midi + semis, finger: song.autoFingering ? null : n.finger })),
+    keyFifths: transposeKey(song.keyFifths, semis),
+    // les doigtés écrits ne sont gardés que s'ils restent jouables (pas de pouce ni de 5e doigt sur une touche noire)
+    notes: song.notes.map((n) => {
+      const midi = n.midi + semis;
+      const keep = !song.autoFingering && n.finger && !(isBlack(midi) && (n.finger === 1 || n.finger === 5));
+      return { ...n, midi, finger: keep ? n.finger : null };
+    }),
     title: song.title,
     transposed: (song.transposed || 0) + semis,
   });

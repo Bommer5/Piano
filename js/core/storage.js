@@ -2,6 +2,11 @@
 
 const PREFIX = 'pianocoach.';
 
+/** Date locale AAAA-MM-JJ (et non UTC : une séance à 0h30 compte pour le bon jour). */
+export function localDate(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function read(key, fallback) {
   try {
     const v = globalThis.localStorage?.getItem(PREFIX + key);
@@ -30,6 +35,7 @@ export const DEFAULT_SETTINGS = {
   metronome: false,
   countIn: true,
   octaveTolerant: true,
+  midiLocalSound: true, // jouer le son de l'app pour les notes d'un clavier MIDI (désactiver avec un piano numérique)
   micSensitivity: 0.012,
   latencyMs: 0,
   theme: 'auto',
@@ -61,7 +67,7 @@ export const store = {
     all[songId] = p;
     write('progress', all);
     const days = read('days', {});
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDate();
     days[today] = (days[today] || 0) + (result.durationSec || 0);
     write('days', days);
     return p;
@@ -73,8 +79,8 @@ export const store = {
     const days = read('days', {});
     let n = 0;
     const d = new Date();
-    if (!days[d.toISOString().slice(0, 10)]) d.setDate(d.getDate() - 1);
-    while (days[d.toISOString().slice(0, 10)]) {
+    if (!days[localDate(d)]) d.setDate(d.getDate() - 1);
+    while (days[localDate(d)]) {
       n++;
       d.setDate(d.getDate() - 1);
     }

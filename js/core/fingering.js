@@ -5,10 +5,10 @@ import { isBlack } from './notes.js';
 // Écarts (en demi-tons) pour la main droite entre deux doigts a<b :
 // [MinPrac, MinComf, MinRel, MaxRel, MaxComf, MaxPrac]
 const SPANS = {
-  '1-2': [-5, -3, 1, 2, 8, 10],
-  '1-3': [-4, -2, 3, 4, 10, 12],
-  '1-4': [-3, -1, 5, 6, 12, 14],
-  '1-5': [-1, 1, 7, 8, 13, 15],
+  '1-2': [-5, -3, 1, 5, 8, 10],
+  '1-3': [-4, -2, 3, 7, 10, 12],
+  '1-4': [-3, -1, 5, 9, 12, 14],
+  '1-5': [-1, 1, 7, 10, 13, 15],
   '2-3': [1, 1, 1, 2, 3, 5],
   '2-4': [1, 1, 3, 4, 5, 7],
   '2-5': [2, 2, 5, 6, 8, 10],
@@ -55,7 +55,10 @@ export function chordFingers(midis) {
   if (n === 3) {
     const mid = midis[1] - midis[0];
     if (span <= 5) return [1, 2, 4];
-    return mid <= 4 ? [1, 3, 5] : [1, 2, 5];
+    // Quarte en bas (2e renversement, ex. Sol-Do-Mi) -> 1-3-5 ; quarte en haut (1er renversement, Mi-Sol-Do) -> 1-2-5
+    if (mid >= 5) return [1, 3, 5];
+    if (span - mid >= 5) return [1, 2, 5];
+    return [1, 3, 5];
   }
   if (n === 4) return span <= 9 ? [1, 2, 3, 5] : [1, 2, 4, 5];
   return [1, 2, 3, 4, 5].slice(0, n);

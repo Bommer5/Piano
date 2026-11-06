@@ -35,7 +35,8 @@ export class MicListener {
     this.analyser.fftSize = 16384; // bonne résolution pour les accords
     this.analyser.smoothingTimeConstant = 0;
     this.source.connect(this.analyser);
-    this.time = new Float32Array(4096);
+    this.full = new Float32Array(this.analyser.fftSize);
+    this.time = this.full.subarray(this.full.length - 4096); // les 4096 échantillons les PLUS RÉCENTS
     this.freqDb = new Float32Array(this.analyser.frequencyBinCount);
     this.onset = new OnsetDetector({ minRms: this.sensitivity });
     this.running = true;
@@ -69,10 +70,10 @@ export class MicListener {
   }
 
   process() {
-    // Les 4096 derniers échantillons suffisent pour YIN jusqu'à ~25 Hz à 48 kHz.
-    this.analyser.getFloatTimeDomainData(this.time);
+    // getFloatTimeDomainData remplit depuis le plus ancien : on lit tout le tampon et on garde la fin.
+    this.analyser.getFloatTimeDomainData(this.full);
     const sr = this.sampleRate;
-    const res = detectPitch(this.time, sr, { minRms: this.sensitivity * 0.6, minFreq: 26, maxFreq: 4300 });
+    const res = detectPitch(this.time, sr, { minRms: this.sensitivity * 0.6, minFreq: 40, maxFreq: 4300 });
     let level = 0;
     for (let i = 0; i < this.time.length; i++) level += this.time[i] * this.time[i];
     level = Math.sqrt(level / this.time.length);
