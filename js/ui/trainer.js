@@ -250,6 +250,9 @@ export class Trainer {
       else if (e.code === 'Escape') this.pause();
     };
     window.addEventListener('keydown', this._keys);
+    // Pause automatique quand on quitte l'onglet (sinon le mode Tempo continue et fausse le score)
+    this._vis = () => document.hidden && this.playing && this.opts.mode !== 'wait' && this.pause();
+    document.addEventListener('visibilitychange', this._vis);
   }
 
   updateMidiStatus() {
@@ -658,6 +661,7 @@ export class Trainer {
     cancelAnimationFrame(this.raf);
     this.unsub.forEach((f) => f());
     window.removeEventListener('keydown', this._keys);
+    document.removeEventListener('visibilitychange', this._vis);
     this.roll.destroy();
     for (const m of this.held) synth.releaseNote(m);
   }
