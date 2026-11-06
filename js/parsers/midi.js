@@ -1,0 +1,290 @@
+// Import / export de fichiers MIDI standard (SMF format 0 et 1).
+//
+// Import : VLQ, running status, sysex et méta-événements ignorés sauf tempo (0x51), mesure (0x58),
+// armure (0x59) et nom de piste (0x03). Note-on de vélocité 0 = note-off. Le canal 10 (percussions)
+// est ignoré. Les temps sont convertis en temps de noire (ticks / division).
+// Attribution des mains : une piste dont le nom désigne clairement une main (« Main droite »,
+// « Right hand », « RH », « MG »…) est respectée ; sinon, s'il y a au moins deux pistes contenant
+// des notes : 1re → main droite, 2e → main gauche, les suivantes selon leur hauteur moyenne ;
+// s'il n'y a qu'une piste : séparation au Do central (midi ≥ 60 → main droite).
+//
+// Export : format 1, 480 ticks par noire, piste 0 = tempo/mesure/armure, puis une piste par main.
+
+const r6 = (x) => Math.round(x * 1e6) / 1e6;
+
+function midiError(msg) {
+  return new Error(`Fichier MIDI invalide : ${msg}`);
+}
+
+function handFromName(name) {
+  if (!name) return null;
+  const s = name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+  if (/\b(main droite|right hand|right|droite|rh|md|treble)\b/.test(s)) return 'R';
+  if (/\b(main gauche|left hand|left|gauche|lh|mg|bass|basse)\b/.test(s)) return 'L';
+  return null;
+}
+
+/**
+ * Analyse un fichier MIDI.
+ * @param {ArrayBuffer|Uint8Array} arrayBuffer
+ * @returns {object} morceau brut pour prepareSong
+ */
+export function parseMidi(arrayBuffer) {
+  const u8 = arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer);
+  const len = u8.length;
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  const str4 = (p) => String.fromCharCode(u8[p], u8[p + 1], u8[p + 2], u8[p + 3]);
+
+  // Fichiers RIFF RMID : on cherche l'en-tête MThd au début.
+  let p0 = 0;
+  if (len >= 4 && str4(0) !== 'MThd') {
+    const lim = Math.min(len - 4, 64);
+    for (let k = 0; k <= lim; k++) {
+      if (str4(k) === 'MThd') {
+        p0 = k;
+        break;
+      }
+    }
+  }
+  if (len < p0 + 14 || str4(p0) !== 'MThd') throw midiError('en-tête « MThd » introuvable (ce n’est pas un fichier MIDI).');
+  const hlen = dv.getUint32(p0 + 4);
+  if (hlen < 6) throw midiError('en-tête trop court.');
+  const format = dv.getUint16(p0 + 8);
+  const ntrks = dv.getUint16(p0 + 10);
+  const division = dv.getUint16(p0 + 12);
+  if (format > 2) throw midiError(`format ${format} inconnu.`);
+  if (division & 0x8000) {
+    throw new Error(
+      'Ce fichier MIDI utilise une base de temps SMPTE (images/seconde) au lieu de temps musicaux : ' +
+        'il n’est pas pris en charge. Réenregistrez-le depuis votre logiciel en base « ticks par noire ».',
+    );
+  }
+  if (division === 0) throw midiError('division nulle.');
+
+  let p = p0 + 8 + hlen;
+  const tracks = [];
+  let tempo, timeSig, keyFifths;
+  let chunkGuard = 0;
+  while (p + 8 <= len && tracks.length < ntrks + 16 && chunkGuard++ < 100000) {
+    const id = str4(p);
+    const clen = dv.getUint32(p + 4);
+    const start = p + 8;
+    const end = Math.min(len, start + clen);
+    p = start + clen;
+    if (id !== 'MTrk') continue;
+
+    const track = { name: null, notes: [], channels: new Set() };
+    const open = new Map(); // (ch<<7|key) -> [{tick, vel}]
+    let q = start;
+    let tick = 0;
+    let status = 0;
+    const readVLQ = () => {
+      let v = 0;
+      for (let k = 0; k < 4; k++) {
+        if (q >= end) throw midiError('piste tronquée.');
+        const b = u8[q++];
+        v = v * 128 + (b & 0x7f);
+        if (!(b & 0x80)) return v;
+      }
+      throw midiError('quantité de longueur variable invalide.');
+    };
+    const need = (n) => {
+      if (q + n > end) throw midiError('piste tronquée.');
+    };
+    const closeNote = (ch, key, at) => {
+      const k = (ch << 7) | key;
+      const stack = open.get(k);
+      if (!stack || !stack.length) return;
+      const on = stack.shift();
+      if (at > on.tick) track.notes.push({ midi: key, startTick: on.tick, endTick: at, ch });
+    };
+
+    while (q < end) {
+      tick += readVLQ();
+      if (q >= end) break;
+      let b = u8[q];
+      if (b & 0x80) {
+        q++;
+        if (b < 0xf0) status = b;
+      } else {
+        if (!status) throw midiError('octet de statut manquant (running status sans statut précédent).');
+        b = status;
+      }
+      if (b === 0xff) {
+        need(1);
+        const type = u8[q++];
+        const l = readVLQ();
+        need(l);
+        const d = u8.subarray(q, q + l);
+        q += l;
+        if (type === 0x51 && l >= 3 && tempo === undefined) {
+          const us = (d[0] << 16) | (d[1] << 8) | d[2];
+          if (us > 0) tempo = Math.round(6000000000 / us) / 100; // précision 0,01 BPM
+        } else if (type === 0x58 && l >= 2 && timeSig === undefined) {
+          if (d[0] > 0 && d[1] < 8) timeSig = [d[0], 2 ** d[1]];
+        } else if (type === 0x59 && l >= 1 && keyFifths === undefined) {
+          const sf = d[0] > 127 ? d[0] - 256 : d[0];
+          if (sf >= -7 && sf <= 7) keyFifths = sf;
+        } else if (type === 0x03 && track.name == null) {
+          track.name = new TextDecoder('utf-8').decode(d).replace(/\0/g, '').trim() || null;
+        } else if (type === 0x2f) {
+          break;
+        }
+        continue;
+      }
+      if (b === 0xf0 || b === 0xf7) {
+        const l = readVLQ();
+        need(l);
+        q += l;
+        continue;
+      }
+      if (b >= 0xf0) throw midiError(`événement système 0x${b.toString(16)} inattendu dans une piste.`);
+      const kind = b & 0xf0;
+      const ch = b & 0x0f;
+      const nData = kind === 0xc0 || kind === 0xd0 ? 1 : 2;
+      need(nData);
+      const d1 = u8[q] & 0x7f;
+      const d2 = nData === 2 ? u8[q + 1] & 0x7f : 0;
+      q += nData;
+      if (kind === 0x90 && d2 > 0) {
+        track.channels.add(ch);
+        const k = (ch << 7) | d1;
+        if (!open.has(k)) open.set(k, []);
+        open.get(k).push({ tick, vel: d2 });
+      } else if (kind === 0x80 || (kind === 0x90 && d2 === 0)) {
+        closeNote(ch, d1, tick);
+      }
+    }
+    // Notes jamais relâchées : fermées en fin de piste.
+    for (const [k, stack] of open) for (const _ of [...stack]) closeNote(k >> 7, k & 0x7f, tick);
+    track.notes = track.notes.filter((n) => n.ch !== 9);
+    tracks.push(track);
+  }
+  if (!tracks.length) throw midiError('aucune piste (MTrk) trouvée.');
+
+  const noteTracks = tracks.filter((t) => t.notes.length);
+  const avg = (t) => t.notes.reduce((s, n) => s + n.midi, 0) / t.notes.length;
+  const song = { notes: [] };
+  // Titre : nom de la première piste si c'est la piste de tempo (format 1) ou un fichier format 0.
+  const t0 = tracks[0];
+  if (t0.name && (format === 0 || !t0.notes.length || noteTracks.length === 1)) song.title = t0.name;
+  if (tempo) song.tempo = tempo;
+  if (timeSig) song.timeSig = timeSig;
+  if (keyFifths !== undefined) song.keyFifths = keyFifths;
+
+  const named = noteTracks.map((t) => handFromName(t.name));
+  const useNames = named.some((h) => h);
+  noteTracks.forEach((t, i) => {
+    for (const n of t.notes) {
+      let hand;
+      if (useNames && named[i]) hand = named[i];
+      else if (noteTracks.length === 1) hand = n.midi >= 60 ? 'R' : 'L';
+      else if (!useNames && i === 0) hand = 'R';
+      else if (!useNames && i === 1) hand = 'L';
+      else hand = avg(t) >= 60 ? 'R' : 'L';
+      song.notes.push({
+        midi: n.midi,
+        start: r6(n.startTick / division),
+        dur: r6((n.endTick - n.startTick) / division),
+        hand,
+        finger: null,
+      });
+    }
+  });
+  song.notes.sort((a, b) => a.start - b.start || a.midi - b.midi);
+  return song;
+}
+
+// ---------------------------------------------------------------------------
+// Export
+// ---------------------------------------------------------------------------
+
+function vlq(v) {
+  v = Math.max(0, Math.floor(v));
+  const bytes = [v & 0x7f];
+  v = Math.floor(v / 128);
+  while (v > 0) {
+    bytes.unshift((v & 0x7f) | 0x80);
+    v = Math.floor(v / 128);
+  }
+  return bytes;
+}
+
+function metaText(type, text) {
+  const b = Array.from(new TextEncoder().encode(String(text)));
+  return [0xff, type, ...vlq(b.length), ...b];
+}
+
+function chunk(id, data) {
+  const l = data.length;
+  const out = [...id].map((c) => c.charCodeAt(0));
+  out.push((l >>> 24) & 255, (l >>> 16) & 255, (l >>> 8) & 255, l & 255);
+  for (let k = 0; k < l; k++) out.push(data[k]);
+  return out;
+}
+
+function trackChunk(events) {
+  // events: [{tick, order, bytes}]
+  events.sort((a, b) => a.tick - b.tick || a.order - b.order);
+  const data = [];
+  let last = 0;
+  for (const e of events) {
+    for (const b of vlq(e.tick - last)) data.push(b);
+    for (const b of e.bytes) data.push(b);
+    last = e.tick;
+  }
+  data.push(0, 0xff, 0x2f, 0);
+  return chunk('MTrk', data);
+}
+
+/**
+ * Exporte un morceau en fichier MIDI format 1.
+ * @param {object} song morceau (préparé ou brut avec notes[])
+ * @returns {Uint8Array}
+ */
+export function exportMidi(song) {
+  const PPQ = 480;
+  const tempo = song.tempo > 0 ? song.tempo : 90;
+  const [num, den] = song.timeSig || [4, 4];
+  const us = Math.max(1, Math.min(0xffffff, Math.round(60000000 / tempo)));
+  const sf = Math.max(-7, Math.min(7, Math.round(song.keyFifths || 0)));
+  const meta = [
+    { tick: 0, order: 0, bytes: metaText(0x03, song.title || 'Sans titre') },
+    { tick: 0, order: 1, bytes: [0xff, 0x51, 3, (us >> 16) & 255, (us >> 8) & 255, us & 255] },
+    { tick: 0, order: 2, bytes: [0xff, 0x58, 4, num & 255, Math.max(0, Math.round(Math.log2(den))), 24, 8] },
+    { tick: 0, order: 3, bytes: [0xff, 0x59, 2, sf & 255, 0] },
+  ];
+  if (song.composer) meta.push({ tick: 0, order: 4, bytes: metaText(0x02, song.composer) });
+  const chunks = [trackChunk(meta)];
+  const hands = [
+    ['R', 'Main droite', 0],
+    ['L', 'Main gauche', 1],
+  ];
+  for (const [hand, name, ch] of hands) {
+    const notes = (song.notes || []).filter((n) => (n.hand === 'L' ? 'L' : 'R') === hand && Number.isFinite(n.midi) && n.midi >= 0 && n.midi <= 127 && n.dur > 0);
+    if (!notes.length) continue;
+    const ev = [
+      { tick: 0, order: -2, bytes: metaText(0x03, name) },
+      { tick: 0, order: -1, bytes: [0xc0 | ch, 0] },
+    ];
+    for (const n of notes) {
+      const s = Math.max(0, Math.round(n.start * PPQ));
+      const e = Math.max(s + 1, Math.round((n.start + n.dur) * PPQ));
+      ev.push({ tick: s, order: 1, bytes: [0x90 | ch, n.midi, 80] });
+      ev.push({ tick: e, order: 0, bytes: [0x80 | ch, n.midi, 0] });
+    }
+    chunks.push(trackChunk(ev));
+  }
+  const header = chunk('MThd', [0, 1, 0, chunks.length, (PPQ >> 8) & 255, PPQ & 255]);
+  const total = header.length + chunks.reduce((a, c) => a + c.length, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const c of [header, ...chunks]) {
+    out.set(c, off);
+    off += c.length;
+  }
+  return out;
+}

@@ -1,0 +1,18 @@
+%abc-2.1
+% Exemple de partition ABC à importer dans l'application.
+% Les doigtés s'écrivent !1! à !5! devant la note.
+X:1
+T:Au clair de la lune
+C:Traditionnel
+M:4/4
+L:1/4
+Q:1/4=90
+V:1 clef=treble
+V:2 clef=bass
+K:C
+V:1
+!1!c c c !2!d | !3!e2 !2!d2 | !1!c !3!e !2!d d | !1!c4 |
+c c c d | e2 d2 | c e d d | c4 |]
+V:2
+!5!C,2 !3!E,2 | !5!C,2 !1!G,2 | !5!C,2 !2!F,2 | !5!C,4 |
+C,2 E,2 | C,2 G,2 | C,2 F,2 | [C,G,]4 |]

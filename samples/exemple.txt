@@ -1,0 +1,9 @@
+# Exemple au format texte de l'application.
+# NOTE:DURÉE:DOIGT — durées en temps (noire = 1), accords avec « + », silences « r ».
+# Attention : « # » commence un commentaire, écrivez les altérations en bémols (Bb3, Eb4…).
+titre: Frère Jacques
+compositeur: Traditionnel
+tempo: 100
+mesure: 4/4
+MD: C4:1:1 D4:1:2 E4:1:3 C4:1:1 | C4:1:1 D4:1:2 E4:1:3 C4:1:1 | E4:1:3 F4:1:4 G4:2:5 | E4:1:3 F4:1:4 G4:2:5
+MG: C3+G3:4:5+1 | C3+G3:4:5+1 | C3+E3:4:5+3 | C3+E3:4:5+3

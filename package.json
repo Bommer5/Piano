@@ -6,7 +6,7 @@
   "private": true,
   "scripts": {
     "start": "node scripts/serve.mjs",
-    "test": "node --test tests/unit/",
+    "test": "node --test \"tests/unit/*.test.mjs\"",
     "test:e2e": "node tests/e2e/run.mjs",
     "test:all": "npm test && npm run test:e2e"
   },

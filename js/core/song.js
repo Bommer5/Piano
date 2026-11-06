@@ -163,7 +163,7 @@ export function parseTextSong(text) {
   const meta = {};
   const R = [], L = [];
   for (const rawLine of String(text).split(/\r?\n/)) {
-    const line = rawLine.replace(/#.*$/, '').trim();
+    const line = rawLine.replace(/(^|\s)#.*$/, '').trim(); // « # commentaire », mais pas le dièse de F#4
     if (!line) continue;
     const m = line.match(/^([A-Za-zéèêÉ ]+)\s*:\s*(.*)$/);
     if (m && !/^[A-Ga-g][#b]?-?\d/.test(line)) {

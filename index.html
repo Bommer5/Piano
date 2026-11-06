@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Piano Coach</title>
+  <meta name="description" content="Apprends le piano : l'app écoute ton piano (micro ou MIDI) et te dit si tu joues les bonnes notes. Import de partitions, morceaux gratuits, cours et doigtés.">
+  <meta name="theme-color" content="#0f1222">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip" href="#main">Aller au contenu</a>
+  <header class="topbar">
+    <a class="brand" href="#/">🎹 <span>Piano Coach</span></a>
+    <nav class="nav" aria-label="Navigation principale">
+      <a href="#/" data-nav="home">Accueil</a>
+      <a href="#/bibliotheque" data-nav="bibliotheque">Morceaux</a>
+      <a href="#/cours" data-nav="cours">Cours</a>
+      <a href="#/accordeur" data-nav="accordeur">Détecteur</a>
+      <a href="#/importer" data-nav="importer">Importer</a>
+      <a href="#/progres" data-nav="progres">Progrès</a>
+      <a href="#/reglages" data-nav="reglages" aria-label="Réglages">⚙️</a>
+    </nav>
+  </header>
+  <main id="main" tabindex="-1"></main>
+  <noscript><p class="card">Piano Coach a besoin de JavaScript pour fonctionner.</p></noscript>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
