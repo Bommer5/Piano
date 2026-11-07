@@ -1,11 +1,44 @@
 // Entrées de notes : clavier MIDI (Web MIDI), clavier d'ordinateur.
+// Les événements portent `t` (performance.now(), ms) : MIDIMessageEvent.timeStamp / KeyboardEvent.timeStamp.
+import { store } from '../core/storage.js';
+import { midiOutput } from './midi-output.js';
+
+/** Le nom ressemble-t-il à un piano numérique / instrument qui produit déjà son propre son ? */
+export function deviceMakesSound(name) {
+  const n = String(name || '').toLowerCase();
+  if (/keystation|launchkey|launchpad|mpk|minilab|keylab|oxygen|impulse|nektar|impact|microkey|komplete|axiom|code ?\d|controller|contrôleur|lpk|seaboard|midiplus|arturia/.test(n)) return false;
+  return /piano|digital|clavinova|arius|privia|celviano|cdp|ydp|clp|cvp|p-\d|p\d{2,3}\b|fp-|rd-|hp\d|lx\d|kawai|nord|stage|es\d{3}|ca\d{2}|dgx|psr|yamaha|casio|roland|korg|kurzweil|synth|workstation/.test(n);
+}
+
+/**
+ * Décode un message MIDI entrant (Web MIDI fournit des messages complets : pas de running status).
+ * @returns {object|null} {type:'noteon'|'noteoff'|'cc'|'pitchbend'|'program', channel(1-16), …}
+ */
+export function parseMidiMessage(data) {
+  if (!data || data.length < 1) return null;
+  const status = data[0];
+  if (status < 0x80 || status >= 0xf0) return null; // horloge, sysex… ignorés
+  const cmd = status & 0xf0;
+  const channel = (status & 0x0f) + 1;
+  const d1 = data[1] ?? 0, d2 = data[2] ?? 0;
+  if (cmd === 0x90 && d2 > 0) return { type: 'noteon', channel, midi: d1, velocity: d2 / 127, rawVelocity: d2 };
+  if (cmd === 0x80 || cmd === 0x90) return { type: 'noteoff', channel, midi: d1, releaseVelocity: d2 / 127 };
+  if (cmd === 0xb0) return { type: 'cc', channel, cc: d1, value: d2 };
+  if (cmd === 0xe0) return { type: 'pitchbend', channel, value: ((d2 << 7) | d1) - 8192 };
+  if (cmd === 0xc0) return { type: 'program', channel, program: d1 };
+  return null;
+}
 
 export class MidiInput {
   constructor() {
     this.listeners = new Set();
-    this.devices = [];
+    this.devices = []; // noms des entrées actives (compatibilité)
+    this.inputs = []; // [{id, name, manufacturer, enabled}]
     this.access = null;
     this.held = new Set();
+    this.selected = null; // null = toutes les entrées ; sinon tableau d'id
+    this.channel = 0; // 0 = tous les canaux
+    this.applySettings(store.settings());
   }
   on(fn) {
     this.listeners.add(fn);
@@ -17,33 +50,65 @@ export class MidiInput {
   get supported() {
     return typeof navigator !== 'undefined' && !!navigator.requestMIDIAccess;
   }
+  /** Réglages : midiInputIds (null = tous), midiInChannel (0 = tous). */
+  applySettings(s = {}) {
+    this.selected = Array.isArray(s.midiInputIds) ? s.midiInputIds : null;
+    this.channel = Number(s.midiInChannel ?? 0) || 0;
+    if (this.access) this.bind();
+  }
   async init() {
     if (!this.supported) return [];
     if (this.access) return this.devices;
     this.access = await navigator.requestMIDIAccess();
-    const bind = () => {
-      this.devices = [];
-      for (const input of this.access.inputs.values()) {
-        this.devices.push(input.name);
-        input.onmidimessage = (m) => this.handle(m.data);
-      }
-      this.emit({ type: 'devices', devices: this.devices });
-    };
-    this.access.onstatechange = bind;
-    bind();
+    this.access.onstatechange = () => this.bind();
+    this.bind();
     return this.devices;
   }
-  handle(data) {
-    const [status, d1, d2] = data;
-    const cmd = status & 0xf0;
-    if (cmd === 0x90 && d2 > 0) {
-      this.held.add(d1);
-      this.emit({ type: 'noteon', midi: d1, velocity: d2 / 127, source: 'midi' });
-    } else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) {
-      this.held.delete(d1);
-      this.emit({ type: 'noteoff', midi: d1, source: 'midi' });
-    } else if (cmd === 0xb0 && d1 === 64) {
-      this.emit({ type: 'pedal', down: d2 >= 64, source: 'midi' });
+  bind() {
+    this.devices = [];
+    this.inputs = [];
+    for (const input of this.access.inputs.values()) {
+      const enabled = !this.selected || this.selected.includes(input.id);
+      this.inputs.push({ id: input.id, name: input.name || 'Clavier MIDI', manufacturer: input.manufacturer || '', enabled });
+      if (enabled) {
+        this.devices.push(input.name);
+        input.onmidimessage = (m) => this.handle(m.data, m.timeStamp, input.name);
+      } else input.onmidimessage = null;
+    }
+    this.applyAutoLocalSound();
+    this.emit({ type: 'devices', devices: this.devices, inputs: this.inputs });
+  }
+  /** Mode « automatique » du son local : coupé si l'appareil branché produit déjà le son. */
+  autoLocalSound() {
+    if (!this.devices.length) return null;
+    return !this.devices.some(deviceMakesSound);
+  }
+  applyAutoLocalSound() {
+    const s = store.settings();
+    if ((s.midiLocalSoundMode ?? 'auto') !== 'auto') return;
+    const want = this.autoLocalSound();
+    if (want == null || s.midiLocalSound === want) return;
+    store.saveSettings({ ...s, midiLocalSound: want });
+  }
+  handle(data, timeStamp, device = '') {
+    const msg = parseMidiMessage(data);
+    if (!msg) return;
+    if (this.channel && msg.channel !== this.channel) return;
+    const t = typeof timeStamp === 'number' && timeStamp > 0 ? timeStamp : (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const base = { source: 'midi', t, channel: msg.channel, device };
+    if (msg.type === 'noteon') {
+      this.held.add(msg.midi);
+      midiOutput.markIncoming(msg.midi, device, t);
+      this.emit({ ...base, type: 'noteon', midi: msg.midi, velocity: msg.velocity });
+    } else if (msg.type === 'noteoff') {
+      this.held.delete(msg.midi);
+      this.emit({ ...base, type: 'noteoff', midi: msg.midi });
+    } else if (msg.type === 'cc') {
+      if ([64, 66, 67].includes(msg.cc)) {
+        midiOutput.markIncomingCC(msg.cc, device, t);
+        this.emit({ ...base, type: 'cc', cc: msg.cc, value: msg.value });
+      }
+      if (msg.cc === 64) this.emit({ ...base, type: 'pedal', down: msg.value >= 64, value: msg.value });
     }
   }
 }
@@ -108,13 +173,13 @@ export class ComputerKeyboard {
     if (this.down.has(e.code)) return;
     const midi = this.base + KEY_CODES[e.code];
     this.down.set(e.code, midi);
-    this.emit({ type: 'noteon', midi, velocity: 0.75, source: 'keyboard' });
+    this.emit({ type: 'noteon', midi, velocity: 0.75, source: 'keyboard', t: e.timeStamp || performance.now() });
   }
   keyup(e) {
     if (!this.down.has(e.code)) return;
     const midi = this.down.get(e.code);
     this.down.delete(e.code);
-    this.emit({ type: 'noteoff', midi, source: 'keyboard' });
+    this.emit({ type: 'noteoff', midi, source: 'keyboard', t: e.timeStamp || performance.now() });
   }
   releaseAll() {
     for (const [code, midi] of this.down) this.emit({ type: 'noteoff', midi, source: 'keyboard' });

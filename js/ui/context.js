@@ -3,6 +3,7 @@
 // acceptent des sections supplémentaires via settingsSections / homeSections.
 import { GENRES, SONGS, getSong } from '../data/songs.js';
 import { prepareSong } from '../core/song.js';
+import { applyFingeringOverrides } from '../core/edit.js';
 import { store } from '../core/storage.js';
 import { Trainer } from './trainer.js';
 import { h, stars } from './dom.js';
@@ -35,6 +36,10 @@ export function findSong(id) {
   if (!raw) return null;
   const s = prepareSong(raw);
   s.imported = !getSong(id);
+  // doigtés personnalisés d'un morceau intégré (éditeur, js/views/editor.js)
+  if (!s.imported) {
+    if (applyFingeringOverrides(s.notes, store.get('fingerings.' + id, null))) s.customFingering = true;
+  }
   ctx.prepared.set(id, s);
   return s;
 }

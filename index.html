@@ -11,23 +11,50 @@
   <meta name="mobile-web-app-capable" content="yes">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/notation.css">
+  <link rel="stylesheet" href="css/profile.css">
 </head>
 <body>
   <a class="skip" href="#main">Aller au contenu</a>
   <header class="topbar">
     <a class="brand" href="#/">🎹 <span>Piano Coach</span></a>
     <nav class="nav" aria-label="Navigation principale">
-      <a href="#/" data-nav="home">Accueil</a>
-      <a href="#/bibliotheque" data-nav="bibliotheque">Morceaux</a>
-      <a href="#/cours" data-nav="cours">Cours</a>
-      <a href="#/accordeur" data-nav="accordeur">Détecteur</a>
-      <a href="#/importer" data-nav="importer">Importer</a>
-      <a href="#/progres" data-nav="progres">Progrès</a>
-      <a href="#/reglages" data-nav="reglages" aria-label="Réglages">⚙️</a>
+      <a href="#/" data-nav="home"><i aria-hidden="true">🏠</i><span>Accueil</span></a>
+      <a href="#/bibliotheque" data-nav="bibliotheque"><i aria-hidden="true">🎼</i><span>Morceaux</span></a>
+      <a href="#/cours" data-nav="cours"><i aria-hidden="true">🎓</i><span>Cours</span></a>
+      <a href="#/jeux" data-nav="jeux"><i aria-hidden="true">🎮</i><span>Jeux</span></a>
+      <a href="#/progres" data-nav="progres"><i aria-hidden="true">📈</i><span>Progrès</span></a>
+      <details class="nav-more">
+        <summary aria-label="Plus de pages"><i aria-hidden="true">☰</i><span>Plus</span></summary>
+        <div class="nav-menu">
+          <a href="#/accordeur" data-nav="accordeur">🎤 Détecteur</a>
+          <a href="#/importer" data-nav="importer">📂 Importer</a>
+          <a href="#/glossaire" data-nav="glossaire">📖 Glossaire</a>
+          <a href="#/carnet" data-nav="carnet">📒 Carnet du prof</a>
+          <a href="#/reglages" data-nav="reglages">⚙️ Réglages</a>
+        </div>
+      </details>
     </nav>
+    <div id="profile-slot" class="profile-slot"></div>
   </header>
-  <main id="main" tabindex="-1"></main>
+  <main id="main" tabindex="-1">
+    <div class="boot" id="boot"><div class="boot-keys"><span></span><span></span><span></span><span></span><span></span></div><p>Chargement de Piano Coach…</p></div>
+  </main>
   <noscript><p class="card">Piano Coach a besoin de JavaScript pour fonctionner.</p></noscript>
-  <script type="module" src="js/app.js"></script>
+  <script>
+    // Écran d'erreur lisible plutôt qu'une page blanche si un module ne se charge pas (vieux navigateur, fichier manquant…)
+    window.__bootFail = function (msg) {
+      var m = document.getElementById('main');
+      m.innerHTML = '<div class="card error" style="margin:24px auto;max-width:560px"><h2>Piano Coach n’a pas pu démarrer</h2>' +
+        '<p>' + String(msg).replace(/[<>&]/g, '') + '</p><p>Vérifie que tu utilises une version récente de Chrome, Edge, Firefox ou Safari, puis recharge la page.</p>' +
+        '<button class="btn primary" onclick="location.reload()">Recharger</button></div>';
+    };
+    window.addEventListener('error', function (e) { if (!window.__booted && e.message) window.__bootFail(e.message); });
+    setTimeout(function () { if (!window.__booted) window.__bootFail('Le chargement prend trop de temps (connexion lente ou fichier manquant).'); }, 15000);
+  </script>
+  <script type="module">
+    import('./js/app.js').then(function () { window.__booted = true; }).catch(function (e) { console.error(e); window.__bootFail(e && e.message || e); });
+  </script>
+  <script nomodule>window.__bootFail('Ce navigateur est trop ancien pour Piano Coach.');</script>
 </body>
 </html>

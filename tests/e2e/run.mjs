@@ -36,6 +36,8 @@ function assert(c, msg) {
 
 const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 }, permissions: ['microphone'] });
+// L'accueil guidé (#/bienvenue) s'affiche au premier lancement : on le marque comme fait.
+await ctx.addInitScript(() => localStorage.setItem('pianocoach.onboarded', 'true'));
 const page = await ctx.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
@@ -279,6 +281,7 @@ try {
 
   await check('Mobile : pas de défilement horizontal, menus utilisables', async () => {
     const m = await browser.newContext({ viewport: { width: 375, height: 760 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+    await m.addInitScript(() => localStorage.setItem('pianocoach.onboarded', 'true'));
     const p = await m.newPage();
     const errs = [];
     p.on('pageerror', (e) => errs.push(e.message));

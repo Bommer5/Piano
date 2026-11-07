@@ -11,6 +11,8 @@ export class NoteRoll {
     this.showFingers = true;
     this.labels = null;
     this.loop = null;
+    this.overlay = null; // 2e couche : notes jouées (prise) [{midi,start,dur,judge}]
+    this.noteColor = null; // (midi) => couleur fixe (mode enfant)
     this._resize = () => this.resize();
     window.addEventListener('resize', this._resize);
     this.resize();
@@ -43,6 +45,7 @@ export class NoteRoll {
       hit: cs.getPropertyValue('--ok').trim() || '#2ecc71',
       miss: cs.getPropertyValue('--bad').trim() || '#ff4d5e',
       grid: cs.getPropertyValue('--grid').trim() || 'rgba(255,255,255,.06)',
+      warn: cs.getPropertyValue('--warn').trim() || '#ffb020',
       text: '#fff',
     };
   }
@@ -87,7 +90,7 @@ export class NoteRoll {
       const y1 = yOf(n.start + n.dur) + 1, y0 = yOf(n.start);
       const st = this.state.get(n.id);
       const inactive = info.activeHands !== 'both' && n.hand !== info.activeHands;
-      let col = st === 'miss' || st === 'wrong' ? c.miss : st ? c.hit : c[n.hand] || c.R;
+      let col = st === 'miss' || st === 'wrong' ? c.miss : st ? c.hit : (this.noteColor && this.noteColor(n.midi)) || c[n.hand] || c.R;
       ctx.globalAlpha = inactive ? 0.28 : n.start + n.dur < beat ? 0.45 : 1;
       const r = Math.min(6, ww / 3);
       ctx.fillStyle = col;
@@ -114,6 +117,7 @@ export class NoteRoll {
       }
     }
     ctx.globalAlpha = 1;
+    if (this.overlay) this.drawOverlay(beat, yOf, c);
     // ligne de jeu
     const grad = ctx.createLinearGradient(0, h - 10, 0, h);
     grad.addColorStop(0, 'rgba(255,255,255,0)');
@@ -122,6 +126,30 @@ export class NoteRoll {
     ctx.fillRect(0, h - 10, w, 10);
   }
 }
+
+NoteRoll.prototype.drawOverlay = function (beat, yOf, c) {
+  const { ctx, w } = this;
+  const cols = { ok: c.hit, early: c.warn, late: c.warn, wrong: '#9aa0a6', extra: '#9aa0a6' };
+  ctx.lineWidth = 2;
+  for (const n of this.overlay) {
+    if (n.start > beat + this.beatsVisible || n.start + n.dur < beat - 0.5) continue;
+    const g = this.keyboard.geometry(n.midi);
+    if (!g) continue;
+    const x = g.x * w + 3, ww = Math.max(3, g.w * w - 6);
+    const y1 = yOf(n.start + n.dur) + 1, y0 = yOf(n.start);
+    const col = cols[n.judge] || '#ffffff';
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = col;
+    ctx.setLineDash(n.judge === 'wrong' || n.judge === 'extra' ? [4, 3] : []);
+    roundRect(ctx, x, y1, ww, Math.max(4, y0 - y1 - 1), Math.min(4, ww / 3));
+    ctx.stroke();
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = col;
+    ctx.fill();
+  }
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+};
 
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();

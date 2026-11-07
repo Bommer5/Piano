@@ -8,3 +8,6 @@ import './tuner.js';
 import './import.js';
 import './progress.js';
 import './settings.js';
+import './welcome.js';
+import './glossary.js';
+import './teacher.js';

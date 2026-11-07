@@ -148,3 +148,24 @@ export function estimateNotes(mag, sampleRate, { a4 = 440, lo = 28, hi = 100, ma
   }
   return res.sort((a, b) => b.p - a.p).slice(0, maxNotes).map((r) => r.m).sort((a, b) => a - b);
 }
+
+/**
+ * Énergie d'une fréquence quelconque (algorithme de Goertzel, fenêtre de Hann).
+ * Beaucoup moins coûteux qu'une FFT quand on ne veut que quelques fréquences.
+ * @returns {number} magnitude normalisée (≈ amplitude de la sinusoïde)
+ */
+export function goertzel(buf, sampleRate, freq) {
+  const n = buf.length;
+  if (!n || freq <= 0 || freq >= sampleRate / 2) return 0;
+  const w = (2 * Math.PI * freq) / sampleRate;
+  const coeff = 2 * Math.cos(w);
+  let s1 = 0, s2 = 0;
+  const k = (2 * Math.PI) / (n - 1 || 1);
+  for (let i = 0; i < n; i++) {
+    const s = buf[i] * (0.5 - 0.5 * Math.cos(k * i)) + coeff * s1 - s2;
+    s2 = s1;
+    s1 = s;
+  }
+  const p = s1 * s1 + s2 * s2 - coeff * s1 * s2;
+  return (Math.sqrt(Math.max(0, p)) * 4) / n;
+}

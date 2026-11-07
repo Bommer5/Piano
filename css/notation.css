@@ -1,0 +1,32 @@
+/* Portée : notation fidèle (js/ui/staff.js). Complète les règles .staff de style.css. */
+.staff path.accidental, .staff path.keysig { fill: none; stroke: var(--text); stroke-linecap: butt; font-size: 0; }
+.staff path.accidental.courtesy { opacity: 0.85; }
+.staff .courtesy-paren { font-size: 13px; fill: var(--muted); }
+.staff .brace { fill: none; stroke: var(--muted); stroke-width: 1.6; opacity: 0.8; }
+.staff .bar-line.final { stroke-width: 3.5; opacity: 0.9; }
+.staff .head.whole { stroke-width: 2; }
+.staff .rest { fill: var(--text); }
+.staff .rest.stroke, .staff path.rest { fill: none; stroke: var(--text); stroke-linecap: round; stroke-linejoin: round; }
+.staff rect.rest { stroke: none; fill: var(--text); }
+.staff .rest-g.inactive { opacity: 0.3; }
+.staff .chord.inactive, .staff .beam.inactive { opacity: 0.3; }
+.staff .beam-bar { fill: var(--text); }
+.staff .tie, .staff .slur { fill: var(--text); stroke: var(--text); stroke-width: 0.6; opacity: 0.9; }
+.staff .slur { opacity: 0.75; }
+.staff .tuplet-num { font: italic 700 11px Georgia, 'Times New Roman', serif; fill: var(--text); }
+.staff .tuplet-bracket { fill: none; stroke: var(--text); stroke-width: 1; }
+.staff .chord-symbol { font: 700 12px var(--font, system-ui), sans-serif; fill: var(--accent2); }
+.staff .tempo-mark { font: 700 11px var(--font, system-ui), sans-serif; fill: var(--muted); }
+.staff .dynamic { font: italic 800 15px Georgia, 'Times New Roman', serif; fill: var(--text); letter-spacing: -0.5px; }
+.staff .hairpin { fill: none; stroke: var(--text); stroke-width: 1.2; }
+.staff .pedal-mark { font: italic 700 13px Georgia, 'Times New Roman', serif; fill: var(--muted); }
+.staff .articulation { fill: var(--text); }
+.staff .articulation-line { fill: none; stroke: var(--text); stroke-width: 1.5; }
+.staff .hidden-measure rect { fill: var(--card2); stroke: var(--line); stroke-dasharray: 4 3; }
+.staff .hidden-measure .hidden-label { font: 800 22px var(--font, system-ui), sans-serif; fill: var(--muted); }
+.staff .hit-area { fill: transparent; pointer-events: all; }
+.staff.clickable-notes .note.clickable { cursor: pointer; }
+.staff .note.clickable:hover .head, .staff .note.clickable:focus-visible .head { fill: var(--accent); stroke: var(--accent); }
+.staff .note.clickable:focus { outline: none; }
+.staff .note.clickable:focus-visible .hit-area { stroke: var(--accent); stroke-width: 1.5; }
+.staff .note.current .accidental, .staff .note.hit .accidental, .staff .note.miss .accidental { stroke-width: inherit; }
