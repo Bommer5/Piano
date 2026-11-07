@@ -88,6 +88,7 @@ export function startTrainer(s, query = {}, { back, onNext, title, subtitle } = 
   if (query.from) opts.from = (Number(query.from) - 1) * bpm;
   if (query.to) opts.to = Math.min(s.totalBeats, Number(query.to) * bpm);
   if (query.loop) opts.loop = true;
+  if (query.variant) opts.variant = query.variant; // variante rythmique (coursegen : 'long-short' | 'short-long')
   main.append(h('div', { class: 'play-head' }, [
     h('a', { class: 'btn tiny', href: back || '#/bibliotheque' }, '← Retour'),
     h('div', {}, [h('h1', { class: 'h-small' }, title || s.title), subtitle ? h('p', { class: 'muted small' }, subtitle) : h('p', { class: 'muted small' }, `${s.composer || ''}${s.autoFingering ? ' · doigtés suggérés automatiquement' : ''}`)]),

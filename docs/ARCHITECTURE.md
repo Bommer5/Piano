@@ -3,16 +3,35 @@
 Application web 100 % navigateur (HTML/CSS/JS en modules ES, **aucune dépendance, aucune étape de build, aucun serveur**). Installable en PWA (Android). Tout le texte visible est en **français**.
 
 ## Arborescence
-- `index.html`, `css/style.css`, `sw.js` (hors-ligne), `manifest.webmanifest`
-- `js/app.js` — routeur (hash `#/chemin?query`), démarrage.
-- `js/ui/context.js` — état partagé : `ctx.settings`, `ctx.prepared`, `main`, `onCleanup(fn)`, `registerRoute(re, fn)`, `findSong(id)`, `allSongs()`, `genreOf`, `levelLabel`, `section(title, children)`, `statCard`, `songCard`, `startTrainer(song, query, {back,onNext,title,subtitle})`, registres `settingsSections` (fonctions `() => Node` ajoutées à la page Réglages) et `homeSections` (cartes ajoutées à l'accueil).
-- `js/views/*.js` — une page par fichier, chaque fichier appelle `registerRoute`. Nouvelles pages : créer `js/views/x.js` **et** ajouter une ligne `import './x.js';` dans `js/views/index.js`.
-- `js/ui/` — `trainer.js` (écran d'entraînement), `staff.js` (portée SVG), `roll.js` (notes qui tombent), `keyboard.js` (clavier `PianoKeyboard`, `keyDiagram`), `dom.js` (`h()`, `toast`, `modal`, `download`, `escapeHtml`, `stars`).
-- `js/audio/` — `synth.js` (Web Audio : `playNote`, `releaseNote`, `setSustain`, `click`, `feedbackSound`), `mic.js` (événements `frame` / `onset`), `midi-input.js` (Web MIDI + clavier d'ordinateur).
-- `js/core/` — logique pure testable dans Node : `notes.js`, `pitch.js` (YIN), `spectrum.js` (FFT, `matchChord`, `estimateNotes`), `onset.js`, `song.js` (modèle, notation compacte, `prepareSong`, `buildEvents`, `transposeSong`, `phrases`), `fingering.js`, `practice.js` (`PracticeEngine`), `coursegen.js`, `storage.js` (`store`, `DEFAULT_SETTINGS`, `localDate`), `transcribe.js` (audio → partition).
-- `js/parsers/` — MusicXML/MXL/MIDI/ABC/texte/JSON + audio ; `index.js` (`importScoreFile`, `exportSong`).
-- `js/data/songs.js` (`GENRES`, `SONGS`, `getSong`), `js/data/lessons.js` (`COURSES`, `getCourse`, `getLesson`).
-- Tests : `tests/unit/*.test.mjs` (`npm test` → `node --test "tests/unit/*.test.mjs"`), `tests/e2e/run.mjs` (Playwright, `npm run test:e2e`).
+- `index.html` (coquille : barre du haut, navigation, écran d'erreur de démarrage `__bootFail`), `sw.js` (hors-ligne, liste ASSETS générée), `manifest.webmanifest`, `icon.svg`, `icons/`, `samples/` (fichiers d'exemple pour l'import).
+- `css/` — `style.css` (variables de thème clair/sombre, composants de base), `trainer.css`, `notation.css` (portée), `profile.css` (profils, accessibilité, navigation mobile, carnet), `harmony.css` (accords, éditeur, partage), `audio.css` (réglages audio, calibration), `games.css`. Chaque fichier est lié dans `index.html` (vérifié par `scripts/check-imports.mjs`).
+- `js/app.js` — routeur (hash `#/chemin?query`), table `navOf` (onglet actif par route), démarrage.
+- `js/views/index.js` — charge chaque vue séparément (modulepreload en parallèle puis import dans l'ordre de la liste `VIEWS`) : une vue en échec n'empêche pas les autres (`failedViews`, message « Page introuvable » + « Recharger »). **Nouvelle page : créer `js/views/x.js` et ajouter `['x.js', () => import('./x.js')]` dans `VIEWS`.**
+- `js/views/*.js` — une page par fichier (`registerRoute`) : `home` (accueil, séance du jour), `library`, `song` (fiche, entraînement), `courses` (cours, leçons, exercices, parcours d'un morceau), `tuner` (détecteur), `import`, `progress`, `settings`, `welcome` (accueil guidé), `glossary`, `teacher` (carnet), `audio-settings` (section Réglages + `saveAudio`, `latencyOf`), `calibration`, `games` (hub + outils partagés), `reading`, `rhythm`, `ear`, `chords`, `editor`, `share`, `notation-settings` (section Réglages).
+- `js/ui/` — `context.js` (état partagé : `ctx`, `main`, `onCleanup`, `registerRoute`, `findSong`, `allSongs`, `genreOf`, `levelLabel`, `section`, `statCard`, `songCard`, `startTrainer(song, query, {back,onNext,title,subtitle})` — query : `mode, hands, tempo, from, to, loop, variant` —, registres `settingsSections` et `homeSections`), `shell.js` (profils dans la barre du haut, badges, accessibilité, menu « Plus », rappel, redirection vers l'accueil guidé), `trainer.js` (écran d'entraînement), `staff.js` (portée SVG ; `yOf`, `xOf`, `hiddenMeasures`), `roll.js`, `keyboard.js`, `report.js` (bilan, revue des erreurs), `editor.js`, `dom.js`.
+- `js/audio/` — `synth.js`, `mic.js` + `mic-worklet.js`, `midi-input.js` (Web MIDI + clavier d'ordinateur), `midi-output.js`.
+- `js/core/` — logique pure testable dans Node : `notes.js` (`spell(midi, keyFifths, keyMode)` orthographe tonale), `pitch.js`, `spectrum.js`, `onset.js`, `song.js`, `notation.js`, `fingering.js`, `practice.js`, `coursegen.js` (parcours, `recordStepResult` : étape validée à 80 % deux fois de suite), `storage.js`, `transcribe.js`, `achievements.js`, `plan.js`, `take.js`, `follower.js`, `edit.js`, `harmony.js`, `theory.js`, `share.js`, `reading.js`, `rhythmgame.js`, `eartraining.js`.
+- `js/parsers/` — `musicxml.js`, `mxl.js`, `xml.js`, `midi.js`, `abc.js`, `index.js` (`importScoreFile`, `exportSong`).
+- `js/data/` — `songs.js` (`GENRES`, `SONGS`, `getSong`), `lessons.js` (`COURSES`, `getCourse`, `getLesson`), `glossary.js`.
+- `scripts/` — `serve.mjs` (serveur local), `sw-assets.mjs` (liste ASSETS + version du cache de `sw.js`), `check-imports.mjs` (imports et CSS), `check-pwa.mjs`.
+
+## Routes
+| Route | Vue | Onglet actif |
+|---|---|---|
+| `#/` , `#/seance`, `#/bienvenue` | home, welcome | Accueil |
+| `#/bibliotheque`, `#/morceau/:id`, `#/jouer/:id`, `#/editer/:id`, `#/partage?d=…` | library, song, editor, share | Morceaux |
+| `#/cours`, `#/cours/:id`, `#/lecon/:id`, `#/exercice/:lecon/:n`, `#/parcours/:id[?step=n&rebours=1]` | courses | Cours |
+| `#/jeux`, `#/jeux/lecture`, `#/jeux/dechiffrage`, `#/jeux/rythme`, `#/jeux/oreille` | games, reading, rhythm, ear | Jeux |
+| `#/progres` | progress | Progrès |
+| `#/accordeur`, `#/importer`, `#/accords`, `#/glossaire`, `#/carnet`, `#/reglages`, `#/calibration` | tuner, import, chords, glossary, teacher, settings, calibration | Plus (menu) |
+
+## Tests et vérifications
+- `npm test` — tests unitaires `tests/unit/*.test.mjs` (dont `integrity.test.mjs` : imports, CSS liés, vues importées, `sw-assets --check`).
+- `npm run check` — `scripts/check-imports.mjs` + `sw-assets.mjs --check`.
+- `npm run test:e2e` — parcours fonctionnels Playwright (`tests/e2e/run.mjs`), `tests/e2e/offline.mjs` (hors-ligne).
+- `npm run test:smoke` — visite **toutes** les routes (extraites des `registerRoute`) en 1280×860 et 375×740 : aucune erreur JS/console, pas de défilement horizontal, pas d'écran d'erreur ; teste aussi une vue manquante et un module critique manquant. Captures dans `tests/e2e/screenshots/smoke/`.
+- Après tout ajout/suppression/modification de fichier : `node scripts/sw-assets.mjs` (sinon `npm test` échoue).
+- Notes de design en attente : `docs/DESIGN-NOTES.md`.
 
 ## Modèle de morceau (après `prepareSong`)
 `{ id, title, composer, genre, level, tempo, timeSig:[n,d], keyFifths, notes:[{id, midi, start, dur, hand:'R'|'L', finger}], beatsPerMeasure, totalBeats, measureCount, hands:{R,L}, range:{lo,hi}, autoFingering }` — temps en **noires** (start/dur en temps). Champs optionnels ajoutés par les agents (à rendre toujours facultatifs) : `keyMode`, `tempoMap:[{beat,bpm}]`, `pickupBeats`, `chords:[{beat,symbol}]`, `dynamics:[{beat,mark}]`, `pedal:[{beat,down}]`, et par note `spelling:{step,alter}`, `staff:1|2`, `tieStart/tieStop`, `slur`, `articulations:[]`, `velocity`.

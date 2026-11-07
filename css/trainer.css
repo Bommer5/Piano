@@ -28,8 +28,6 @@
 .btn.small { padding: 6px 10px; font-size: 0.9rem; }
 
 /* Par cœur */
-.staff .memo-mask { fill: var(--bg2); opacity: 0.97; }
-.staff .memo-mask-label { font-size: 26px; text-anchor: middle; opacity: 0.5; }
 
 /* Revoir mes erreurs */
 dialog.modal.report-dlg { width: min(760px, 96vw); max-height: 92vh; overflow: auto; }

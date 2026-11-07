@@ -3,6 +3,7 @@
 // (réécoute, comparaison avec la partition, export .mid, rapport détaillé, revue des erreurs).
 import { PracticeEngine } from '../core/practice.js';
 import { measureOf, transposeSong } from '../core/song.js';
+import { measureNumber } from '../core/notation.js';
 import { matchChord } from '../core/spectrum.js';
 import { noteLabel, FINGER_NAMES, pitchClass } from '../core/notes.js';
 import { createTake, takeNoteOn, takeNoteOff, takePedal, addAnchor, closeTake, judgeOf, takeOverlay, takeBeatAt, takeTimeAt, takeToSong, saveTake, analyzeTake } from '../core/take.js';
@@ -1200,35 +1201,14 @@ export class Trainer {
     if (key !== this.staffPage) {
       this.staffPage = key;
       const from = page * mpp * bpm, to = (page + 1) * mpp * bpm;
-      const hiddenMeasures = this.opts.mode === 'memory' ? [...this.hidden] : [];
-      // masques dessinés ici (indépendants du format de `hiddenMeasures` de la portée)
+      // Mode Par cœur : la portée masque elle-même les mesures (numéros tels qu'affichés,
+      // donc décalés si le morceau commence par une anacrouse).
+      const pickup = this.song.pickupBeats || 0;
+      const hiddenMeasures = this.opts.mode === 'memory' && this.hidden.size ? new Set([...this.hidden].map((i) => measureNumber(i * bpm, bpm, pickup))) : null;
       this.staff.render(this.song, from, to, {
-        settings: this.settings, showFingers: this.showFingers, showNoteNames: this.showNames, activeHands: this.opts.hands,
+        settings: this.settings, showFingers: this.showFingers, showNoteNames: this.showNames, activeHands: this.opts.hands, hiddenMeasures,
         onNoteClick: (x) => this.onStaffNoteClick(x && typeof x === 'object' ? x.id : x),
       });
-      // masques « par cœur » (fonctionne aussi si la portée ne gère pas hiddenMeasures)
-      if (hiddenMeasures.length && this.staff.xOf && this.staff.svg) {
-        const NS = 'http://www.w3.org/2000/svg';
-        for (const hm of hiddenMeasures) {
-          const a = hm * bpm, b = (hm + 1) * bpm;
-          if (b <= from + 1e-6 || a >= to - 1e-6) continue;
-          const r = document.createElementNS(NS, 'rect');
-          const x0 = this.staff.xOf(Math.max(a, from)) - 10, x1 = this.staff.xOf(Math.min(b, to)) - 10;
-          r.setAttribute('x', x0);
-          r.setAttribute('y', 0);
-          r.setAttribute('width', Math.max(0, x1 - x0));
-          r.setAttribute('height', '100%');
-          r.setAttribute('class', 'memo-mask');
-          const t = document.createElementNS(NS, 'text');
-          t.setAttribute('x', (x0 + x1) / 2);
-          t.setAttribute('y', 110);
-          t.setAttribute('class', 'memo-mask-label');
-          t.textContent = '🧠';
-          const cursor = this.staff.cursor;
-          this.staff.svg.insertBefore(r, cursor || null);
-          this.staff.svg.insertBefore(t, cursor || null);
-        }
-      }
       for (const [id, st] of this.roll.state) this.staff.mark(id, st);
     }
     this.staff.clearMarks('current');

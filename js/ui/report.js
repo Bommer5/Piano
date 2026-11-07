@@ -1,7 +1,7 @@
 // Rapport détaillé de fin de session (graphiques SVG), « Revoir mes erreurs », confettis.
 import { h, modal } from './dom.js';
 import { noteLabel, spell } from '../core/notes.js';
-import { StaffView, staffY } from './staff.js';
+import { StaffView } from './staff.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 function s(name, attrs = {}, parent, text) {
@@ -165,12 +165,12 @@ export function showErrorReview(o) {
       if (st) staff.mark(n.id, st === 'miss' || st === 'wrong' ? 'miss' : 'hit');
     }
     if (staff.xOf) {
-      const flats = song.keyFifths < 0;
       for (const e of o.extras) {
         if (e.beat < from - 0.25 || e.beat >= to) continue;
         const clef = e.midi < 60 ? 'bass' : 'treble';
-        const sp = spell(e.midi, flats);
-        const x = staff.xOf(Math.max(from, e.beat)) + 4, y = staffY(sp.diatonic, clef);
+        // Orthographe tonale (Fa♯ en Sol majeur, Si♭ en Fa…) et position verticale de CETTE portée.
+        const sp = spell(e.midi, song.keyFifths || 0, song.keyMode);
+        const x = staff.xOf(Math.max(from, e.beat)) + 4, y = staff.yOf(sp.diatonic, clef);
         const g = s('g', { class: 'extra-note' }, staff.svg);
         s('ellipse', { cx: x, cy: y, rx: 6, ry: 4.3, transform: `rotate(-20 ${x} ${y})` }, g);
         if (sp.alter) s('text', { x: x - 16, y: y + 4, class: 'accidental' }, g, sp.alter > 0 ? '♯' : '♭');

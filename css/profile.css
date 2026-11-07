@@ -148,11 +148,11 @@
 .heat-strip { display: flex; flex-wrap: wrap; gap: 3px; margin: 8px 0; }
 .heat-cell { min-width: 28px; height: 28px; padding: 0 4px; display: grid; place-items: center; border-radius: 6px; font-size: 0.72rem; font-weight: 700; text-decoration: none; color: var(--text); border: 1px solid var(--line); }
 .heat-legend { display: flex; gap: 3px; margin: 4px 0 8px; }
-.h0 { background: var(--card2); }
-.h1 { background: color-mix(in srgb, var(--warn) 35%, var(--card2)); }
-.h2 { background: color-mix(in srgb, var(--warn) 75%, var(--card2)); color: #222; }
-.h3 { background: color-mix(in srgb, var(--bad) 65%, var(--warn)); color: #fff; }
-.h4 { background: var(--bad); color: #fff; }
+.heat-cell.h0 { background: var(--card2); }
+.heat-cell.h1 { background: color-mix(in srgb, var(--warn) 35%, var(--card2)); }
+.heat-cell.h2 { background: color-mix(in srgb, var(--warn) 75%, var(--card2)); color: #222; }
+.heat-cell.h3 { background: color-mix(in srgb, var(--bad) 65%, var(--warn)); color: #fff; }
+.heat-cell.h4 { background: var(--bad); color: #fff; }
 .heat-staff { overflow-x: auto; background: var(--bg2); border-radius: 10px; margin: 8px 0; }
 .heat-staff .heat-rect { opacity: 0.35; }
 .heat-staff .heat-rect.h1 { fill: var(--warn); opacity: 0.2; }

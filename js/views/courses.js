@@ -2,7 +2,7 @@
 import { GENRES, SONGS, getSong } from '../data/songs.js';
 import { COURSES, getCourse, getLesson } from '../data/lessons.js';
 import { prepareSong, phrases, parseTrack } from '../core/song.js';
-import { generateSongCourse, describePosition } from '../core/coursegen.js';
+import { generateSongCourse, describePosition, recordStepResult, stepState } from '../core/coursegen.js';
 import { noteLabel, midiToName, nameToMidi, centsOff, midiToFreq } from '../core/notes.js';
 import { estimateNotes } from '../core/spectrum.js';
 import { PitchSmoother } from '../core/onset.js';
@@ -127,29 +127,48 @@ function viewExercise(lessonId, idx) {
 function viewSongCourse(id, query) {
   const s = findSong(id);
   if (!s) throw new Error('Morceau introuvable.');
-  const steps = generateSongCourse(s);
+  // « Travail à rebours » : les phrases sont apprises de la dernière à la première (la fin du
+  // morceau, souvent moins travaillée, devient la partie la plus sûre). Choix gardé dans l'URL.
+  const backwards = query.rebours === '1';
+  const qs = backwards ? '&rebours=1' : '';
+  const steps = generateSongCourse(s, { backwards });
   const key = 'parcours:' + id;
   const done = store.lessonsDone();
+  const stepKey = (st) => `${store.currentProfile().id}:${key}:${st.id}`; // suivi par joueur
+  // Étape validée à 80 % deux fois de suite (coursegen.recordStepResult) ; les anciennes
+  // validations (store.markLesson) restent reconnues.
+  const isDone = (st) => !!(done[`${key}:${st.id}`] || stepState(stepKey(st))?.validated);
   const stepIdx = query.step != null ? Number(query.step) : -1;
   if (stepIdx >= 0 && steps[stepIdx]) {
     const st = steps[stepIdx];
     const bpm = s.beatsPerMeasure;
     const t = startTrainer(s, {
-      mode: st.mode, hands: st.hands, tempo: st.tempoPct,
+      mode: st.mode, hands: st.hands, tempo: st.tempoPct, variant: st.variant,
       from: Math.floor(st.from / bpm + 1e-6) + 1, to: Math.ceil(st.to / bpm - 1e-6),
     }, {
-      back: `#/parcours/${id}`, title: `${s.title} — étape ${stepIdx + 1}/${steps.length}`, subtitle: `${st.title}. ${st.desc}`,
-      onNext: steps[stepIdx + 1] ? () => (location.hash = `#/parcours/${id}?step=${stepIdx + 1}`) : null,
+      back: `#/parcours/${id}${backwards ? '?rebours=1' : ''}`, title: `${s.title} — étape ${stepIdx + 1}/${steps.length}`, subtitle: `${st.title}. ${st.desc}`,
+      onNext: steps[stepIdx + 1] ? () => (location.hash = `#/parcours/${id}?step=${stepIdx + 1}${qs}`) : null,
     });
     t.hooks.onResult = (sum) => {
-      if (sum.score >= 80) store.markLesson(`${key}:${st.id}`);
+      if (st.mode === 'listen') return store.markLesson(`${key}:${st.id}`);
+      const r = recordStepResult(stepKey(st), sum.score);
+      if (r.justValidated) {
+        store.markLesson(`${key}:${st.id}`);
+        toast('✅ Étape validée : deux fois au moins 80 % d’affilée !');
+      } else if (!r.validated && sum.score >= 80) toast(`Bien ! Encore ${r.remaining} réussite${r.remaining > 1 ? 's' : ''} à 80 % d’affilée pour valider l’étape.`);
     };
     return;
   }
-  main.append(h('a', { class: 'btn tiny', href: `#/morceau/${id}` }, '← ' + s.title), h('h1', {}, `Apprendre « ${s.title} »`), h('p', { class: 'lead' }, `Un parcours en ${steps.length} étapes. Une étape est validée quand tu obtiens au moins 80 %.`));
+  const toggle = h('label', { class: 'check' }, [
+    h('input', { type: 'checkbox', checked: backwards, onchange: (e) => (location.hash = `#/parcours/${id}${e.target.checked ? '?rebours=1' : ''}`) }),
+    h('span', {}, 'Travail à rebours (apprendre les phrases de la fin vers le début)'),
+  ]);
+  main.append(h('a', { class: 'btn tiny', href: `#/morceau/${id}` }, '← ' + s.title), h('h1', {}, `Apprendre « ${s.title} »`), h('p', { class: 'lead' }, `Un parcours en ${steps.length} étapes. Une étape est validée quand tu obtiens au moins 80 % deux fois de suite.`), toggle);
   main.append(h('ol', { class: 'lesson-list' }, steps.map((st, i) => {
-    const ok = done[`${key}:${st.id}`];
-    return h('li', { class: ok ? 'done' : '' }, h('a', { href: `#/parcours/${id}?step=${i}` }, [h('span', { class: 'num' }, ok ? '✓' : i + 1), h('div', {}, [h('b', {}, st.title), h('small', {}, st.desc)]), h('span', { class: 'tag' }, { wait: 'Attente', tempo: 'Tempo', listen: 'Écoute' }[st.mode] + ` · ${st.tempoPct} %`)]));
+    const ok = isDone(st);
+    const tries = stepState(stepKey(st));
+    const partial = !ok && tries?.streak ? ` · ${tries.streak}/2` : '';
+    return h('li', { class: ok ? 'done' : '' }, h('a', { href: `#/parcours/${id}?step=${i}${qs}` }, [h('span', { class: 'num' }, ok ? '✓' : i + 1), h('div', {}, [h('b', {}, st.title), h('small', {}, st.desc)]), h('span', { class: 'tag' }, { wait: 'Attente', tempo: 'Tempo', listen: 'Écoute' }[st.mode] + ` · ${st.tempoPct} %` + partial)]));
   })));
 }
 

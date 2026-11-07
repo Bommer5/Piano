@@ -8,7 +8,9 @@
     "start": "node scripts/serve.mjs",
     "test": "node --test \"tests/unit/*.test.mjs\"",
     "test:e2e": "node tests/e2e/run.mjs",
-    "test:all": "npm test && npm run test:e2e"
+    "test:smoke": "node tests/e2e/smoke.mjs",
+    "check": "node scripts/check-imports.mjs && node scripts/sw-assets.mjs --check",
+    "test:all": "npm test && npm run test:e2e && npm run test:smoke"
   },
   "license": "MIT"
 }

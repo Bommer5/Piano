@@ -25,6 +25,8 @@
 .staff .hidden-measure rect { fill: var(--card2); stroke: var(--line); stroke-dasharray: 4 3; }
 .staff .hidden-measure .hidden-label { font: 800 22px var(--font, system-ui), sans-serif; fill: var(--muted); }
 .staff .hit-area { fill: transparent; pointer-events: all; }
+/* Lignes de portée et lignes supplémentaires : décoratives, elles ne doivent pas intercepter les clics sur les notes. */
+.staff .ledger, .staff .staff-line { pointer-events: none; }
 .staff.clickable-notes .note.clickable { cursor: pointer; }
 .staff .note.clickable:hover .head, .staff .note.clickable:focus-visible .head { fill: var(--accent); stroke: var(--accent); }
 .staff .note.clickable:focus { outline: none; }

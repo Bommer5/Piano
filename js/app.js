@@ -4,7 +4,7 @@ import * as synth from './audio/synth.js';
 import { computerKeyboard } from './audio/midi-input.js';
 import { h, toast } from './ui/dom.js';
 import { ctx, main, routes, applyTheme, findSong } from './ui/context.js';
-import './views/index.js';
+import { failedViews } from './views/index.js';
 
 function parseHash() {
   const raw = location.hash.replace(/^#\/?/, '');
@@ -22,8 +22,11 @@ export function route() {
   main.innerHTML = '';
   main.className = '';
   const top = path.split('/')[0] || 'home';
-  const navOf = { morceau: 'bibliotheque', jouer: 'bibliotheque', lecon: 'cours', parcours: 'cours', exercice: 'cours' };
+  // Onglet de navigation mis en évidence pour chaque route (par défaut : le premier segment).
+  const navOf = { '': 'home', seance: 'home', bienvenue: 'home', morceau: 'bibliotheque', jouer: 'bibliotheque', editer: 'bibliotheque', partage: 'bibliotheque', lecon: 'cours', parcours: 'cours', exercice: 'cours' };
   document.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === (navOf[top] || top)));
+  // « Plus » est mis en évidence quand la page active est dans son menu.
+  document.querySelector('.nav-more')?.classList.toggle('active', !!document.querySelector('.nav-more [data-nav].active'));
   for (const [re, fn] of routes) {
     const m = path.match(re);
     if (m) {
@@ -38,7 +41,9 @@ export function route() {
       return;
     }
   }
-  main.append(h('div', { class: 'card' }, [h('h2', {}, 'Page introuvable'), h('a', { href: '#/', class: 'btn' }, 'Accueil')]));
+  // Une vue qui n'a pas pu se charger n'a pas enregistré ses routes : on le dit clairement.
+  const hint = failedViews.length ? h('p', { class: 'muted' }, 'Une partie de l’application n’a pas pu être chargée (connexion interrompue ?). Recharge la page pour réessayer.') : null;
+  main.append(h('div', { class: 'card' }, [h('h2', {}, 'Page introuvable'), hint, h('div', { class: 'row' }, [h('a', { href: '#/', class: 'btn' }, 'Accueil'), hint ? h('button', { class: 'btn primary', onclick: () => location.reload() }, 'Recharger') : null])]));
 }
 ctx.route = route;
 

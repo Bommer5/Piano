@@ -230,7 +230,9 @@ try {
       await page.locator('.card.preview').waitFor({ timeout: 8000 });
       await page.locator('.card.preview button', { hasText: 'Ajouter' }).click();
       await page.waitForURL(/#\/morceau\//);
-      assert(await page.locator('.song-header h1').isVisible(), 'fiche importée');
+      // La route est rendue sur « hashchange », après que l'URL a changé : on attend le rendu.
+      const ok = await page.locator('.song-header h1').waitFor({ timeout: 5000 }).then(() => true, () => false);
+      assert(ok, `fiche importée (${f})`);
     }
     await go('#/bibliotheque?genre=__import');
     assert((await page.locator('.song-card').count()) >= 4, 'imports absents de la bibliothèque');
