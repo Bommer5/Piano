@@ -1290,7 +1290,7 @@ export class Trainer {
       score: s.score, stars: s.stars, mode: this.opts.mode, hands: this.opts.hands, tempoPct: this.opts.tempoPct, durationSec, bestStreak: s.bestStreak,
       worstMeasures: s.worstMeasures, errorsByMeasure: s.errorsByMeasure, errorsByNote: s.errorsByNote,
       conditions: { mode: this.opts.mode, hands: this.opts.hands, tempoPct: this.opts.tempoPct, rhythmOnly: !!this.opts.rhythmOnly, variant: this.opts.variant || null },
-      from: this.from, to: this.to, songHands: this.baseSong.hands, twoHanded: this.opts.hands === 'both',
+      from: this.from, to: this.to, songHands: this.baseSong.hands, twoHanded: !!(this.baseSong.hands.R && this.baseSong.hands.L),
     };
     if (!this.baseSong.ephemeral) this.recordSafe(rec);
     this.hooks.onResult?.(s, rec);

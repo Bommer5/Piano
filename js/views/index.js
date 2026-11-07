@@ -20,3 +20,4 @@ import './ear.js';
 import './chords.js';
 import './editor.js';
 import './share.js';
+import './notation-settings.js';

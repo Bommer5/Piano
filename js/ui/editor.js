@@ -249,13 +249,18 @@ export class SongEditor {
     this.staffBox.innerHTML = '';
     const sv = new StaffView(this.staffBox);
     const view = { ...this.song, notes: this.notes, beatsPerMeasure: this.bpm };
-    sv.render(view, from, to, { settings: this.settings, showFingers: true, showNoteNames: true });
+    // la portée gère les clics si elle connaît `onNoteClick` ; sinon on s'accroche à noteEls
+    let viaOpt = false;
+    const onNoteClick = (n, e) => { viaOpt = true; e?.stopPropagation?.(); this.select(n.id, !!(e && (e.shiftKey || e.ctrlKey || e.metaKey))); };
+    sv.render(view, from, to, { settings: this.settings, showFingers: true, showNoteNames: true, onNoteClick });
+    const native = sv.svg.classList.contains('clickable-notes');
     for (const [id, g] of sv.noteEls) {
       g.classList.add('editable');
       if (this.selection.has(id)) g.classList.add('selected');
+      if (native) continue;
       g.setAttribute('tabindex', '0');
       g.setAttribute('role', 'button');
-      g.addEventListener('click', (e) => { e.stopPropagation(); this.select(id, e.shiftKey || e.ctrlKey || e.metaKey); });
+      g.addEventListener('click', (e) => { if (viaOpt) return; e.stopPropagation(); this.select(id, e.shiftKey || e.ctrlKey || e.metaKey); });
       g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.select(id, e.shiftKey); } });
     }
     // liste
