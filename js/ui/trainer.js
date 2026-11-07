@@ -147,7 +147,7 @@ export class Trainer {
 
     this.el.controls = h('div', { class: 'controls' }, [
       h('div', { class: 'row' }, [this.el.play, this.el.restart, modeSeg, handSeg, this.el.mic, this.el.midiStatus]),
-      h('details', { class: 'adv-opts', open: readPref('advOpen'), ontoggle: (e) => writePref('advOpen', e.target.open) }, [h('summary', {}, '⚙ Options : tempo, boucle, métronome, aide…'), h('div', { class: 'row small adv' }, [
+      h('details', { class: 'adv-opts', open: readPref('advOpen', true), ontoggle: (e) => writePref('advOpen', e.target.open) }, [h('summary', {}, '⚙ Options : tempo, boucle, métronome, aide…'), h('div', { class: 'row small adv' }, [
         h('label', { class: 'field' }, ['Tempo ', this.el.tempo, this.el.tempoLabel, ' ', this.el.tap]),
         h('span', { class: 'field' }, ['Transposer ', h('button', { class: 'btn tiny', 'aria-label': 'Transposer d’un demi-ton plus bas', onclick: () => this.setOpt('transpose', o.transpose - 1) }, '−'), this.el.transpose, h('button', { class: 'btn tiny', 'aria-label': 'Transposer d’un demi-ton plus haut', onclick: () => this.setOpt('transpose', o.transpose + 1) }, '+')]),
         h('span', { class: 'field' }, ['Mesures ', this.el.loopFrom, ' à ', this.el.loopTo]),
@@ -201,11 +201,13 @@ export class Trainer {
     this.applyView();
     this.updateKidTempo();
     // le clavier doit être visible sans défiler (petits écrans)
-    requestAnimationFrame(() => {
+    const reveal = () => {
       if (this.destroyed) return;
       const r = this.el.kb.getBoundingClientRect();
-      if (r.bottom > innerHeight && r.height < innerHeight) this.el.kb.scrollIntoView({ block: 'end' });
-    });
+      if (r.height && r.bottom > innerHeight + 1 && r.height < innerHeight) this.el.kb.scrollIntoView({ block: 'end' });
+    };
+    requestAnimationFrame(reveal);
+    this.later(reveal, 350);
   }
 
   keyLabel(m) {
@@ -1620,11 +1622,12 @@ export class Trainer {
   }
 }
 
-function readPref(k) {
+function readPref(k, dflt = false) {
   try {
-    return globalThis.localStorage?.getItem('pianocoach.trainer.' + k) === '1';
+    const v = globalThis.localStorage?.getItem('pianocoach.trainer.' + k);
+    return v == null ? dflt : v === '1';
   } catch {
-    return false;
+    return dflt;
   }
 }
 
