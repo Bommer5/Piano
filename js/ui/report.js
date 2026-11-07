@@ -44,6 +44,7 @@ export function timingChart(timing, { from = 0, to = 1, beatsPerMeasure = 4 } = 
 export function histogramChart(hist) {
   const W = 320, H = 110, L = 6, B = 18;
   const svg = svgBox(W, H, 'Histogramme des écarts rythmiques');
+  svg.classList.add('small');
   const max = Math.max(1, ...hist.map((b) => b.count));
   const bw = (W - 2 * L) / hist.length;
   hist.forEach((b, i) => {

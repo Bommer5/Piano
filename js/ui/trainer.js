@@ -201,13 +201,15 @@ export class Trainer {
     this.applyView();
     this.updateKidTempo();
     // le clavier doit être visible sans défiler (petits écrans)
-    const reveal = () => {
-      if (this.destroyed) return;
-      const r = this.el.kb.getBoundingClientRect();
-      if (r.height && r.bottom > innerHeight + 1 && r.height < innerHeight) this.el.kb.scrollIntoView({ block: 'end' });
-    };
-    requestAnimationFrame(reveal);
-    this.later(reveal, 350);
+    requestAnimationFrame(() => this.revealKeyboard());
+    this.later(() => this.revealKeyboard(), 350);
+  }
+
+  /** Fait défiler la page pour que le clavier soit entièrement visible (si possible). */
+  revealKeyboard() {
+    if (this.destroyed || this.opts.mode === 'concert') return;
+    const r = this.el.kb.getBoundingClientRect();
+    if (r.height && r.bottom > innerHeight + 1 && r.height < innerHeight) this.el.kb.scrollIntoView({ block: 'end' });
   }
 
   keyLabel(m) {
@@ -828,6 +830,7 @@ export class Trainer {
     if (this.review) this.closeReview();
     if (this.engine.finished || (this.follower && this._concertDone)) this.resetEngine();
     synth.audioContext();
+    if (!silent) this.revealKeyboard();
     this.playing = true;
     this.el.play.textContent = '⏸ Pause';
     this.el.play.classList.add('on');
@@ -975,6 +978,9 @@ export class Trainer {
     if (this.opts.mode === 'concert') this.el.concertEnd.classList.add('hidden');
     this.resetEngine();
     this.say('On recommence !');
+    this.beat = this.from;
+    this.render(); // marques à jour tout de suite
+    this.revealKeyboard();
   }
 
   // ---------- mode Imiter ----------
