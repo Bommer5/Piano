@@ -146,7 +146,7 @@ export class StaffView {
    */
   render(song, from, to, opts = {}) {
     const settings = opts.settings || {};
-    const width = Math.max(320, this.container.clientWidth || 800);
+    let width = Math.max(320, this.container.clientWidth || 800);
     this.noteEls.clear();
     this.page = { from, to };
     const bpm = song.beatsPerMeasure || 4;
@@ -332,11 +332,16 @@ export class StaffView {
     for (const a of anchors.values()) if (a.bar) a.L += 10;
     const list = [...anchors.values()].sort((a, b) => a.t - b.t);
     const x0 = headerW + list[0].L;
-    const avail = width - 10 - x0;
+    let avail = width - 10 - x0;
     const mins = list.slice(1).map((a, i) => list[i].R + a.L);
     const total = (ppb) => list.slice(1).reduce((s, a, i) => s + Math.max((a.t - list[i].t) * ppb, mins[i]), 0);
     let lo = 0, hi = 2000;
     let k = 1;
+    if (total(0) > avail && this.canScroll()) {
+      // conteneur défilant (aperçu des phrases) : on élargit plutôt que de comprimer
+      width = Math.ceil(x0 + total(0) * 1.15 + 10);
+      avail = width - 10 - x0;
+    }
     if (total(0) > avail) k = avail / total(0);
     else {
       for (let it = 0; it < 40; it++) {
@@ -712,6 +717,16 @@ export class StaffView {
 
     this.cursor = el('line', { x1: 0, x2: 0, y1: TT - 14, y2: BB + 14, class: 'cursor' }, this.svg);
     this.setCursor(from);
+  }
+
+  /** Le conteneur défile-t-il horizontalement (on peut alors élargir la portée) ? */
+  canScroll() {
+    try {
+      const ox = getComputedStyle(this.container).overflowX;
+      return ox === 'auto' || ox === 'scroll';
+    } catch {
+      return false;
+    }
   }
 
   setCursor(beat) {

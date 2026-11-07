@@ -14,7 +14,7 @@
 // La liste ASSETS et VERSION (hash du contenu) sont réécrites par `node scripts/sw-assets.mjs`.
 
 // <ASSETS> (généré par scripts/sw-assets.mjs, ne pas éditer à la main)
-const VERSION = '11d46d6459ea';
+const VERSION = '7a75f17bb2d7';
 const ASSETS = [
   "css/audio.css",
   "css/games.css",

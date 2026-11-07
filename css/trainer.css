@@ -91,3 +91,7 @@ dialog.modal.report-dlg { width: min(760px, 96vw); max-height: 92vh; overflow: a
   .trainer .seg-btn { padding: 6px 8px; }
   .review-legend { display: none; }
 }
+.trainer .adv-opts > summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; padding: 2px 0; }
+.trainer .adv-opts[open] > summary { margin-bottom: 6px; }
+.trainer.kid .adv-opts { display: none; }
+.trainer .roll-wrap { height: clamp(140px, 26vh, 360px); }

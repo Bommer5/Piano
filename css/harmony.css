@@ -80,3 +80,4 @@
   .note-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .chord-kb { height: 110px; }
 }
+.staff .ledger, .staff .staff-line { pointer-events: none; }

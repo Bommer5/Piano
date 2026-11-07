@@ -101,8 +101,8 @@ export class Trainer {
 
   latencyFor(source) {
     const s = this.settings;
-    const key = source === 'mouse' ? 'keyboard' : source?.startsWith('mic') ? 'mic' : source;
-    return s.latency?.[source] ?? s.latency?.[key] ?? s.latencyMs ?? 0;
+    const src = source === 'mouse' ? 'keyboard' : source?.startsWith('mic') ? 'mic' : source;
+    return s.latency?.[src] ?? (src === 'mic' ? s.latencyMs : 0) ?? 0;
   }
 
   // ---------- construction de l'interface ----------
@@ -147,7 +147,7 @@ export class Trainer {
 
     this.el.controls = h('div', { class: 'controls' }, [
       h('div', { class: 'row' }, [this.el.play, this.el.restart, modeSeg, handSeg, this.el.mic, this.el.midiStatus]),
-      h('div', { class: 'row small adv' }, [
+      h('details', { class: 'adv-opts', open: readPref('advOpen'), ontoggle: (e) => writePref('advOpen', e.target.open) }, [h('summary', {}, '⚙ Options : tempo, boucle, métronome, aide…'), h('div', { class: 'row small adv' }, [
         h('label', { class: 'field' }, ['Tempo ', this.el.tempo, this.el.tempoLabel, ' ', this.el.tap]),
         h('span', { class: 'field' }, ['Transposer ', h('button', { class: 'btn tiny', 'aria-label': 'Transposer d’un demi-ton plus bas', onclick: () => this.setOpt('transpose', o.transpose - 1) }, '−'), this.el.transpose, h('button', { class: 'btn tiny', 'aria-label': 'Transposer d’un demi-ton plus haut', onclick: () => this.setOpt('transpose', o.transpose + 1) }, '+')]),
         h('span', { class: 'field' }, ['Mesures ', this.el.loopFrom, ' à ', this.el.loopTo]),
@@ -159,7 +159,7 @@ export class Trainer {
         check('fadeHelp', 'Aide qui s’estompe', 'Masque noms des notes et doigtés après 3 réussites d’affilée'),
         check('rhythmOnly', 'Rythme seul', 'Toute touche est acceptée : seul le placement rythmique compte'),
         this.el.viewSel, this.el.help,
-      ]),
+      ])]),
       kidTempo,
     ]);
 
@@ -200,6 +200,12 @@ export class Trainer {
     this.staff = new StaffView(this.el.staffWrap);
     this.applyView();
     this.updateKidTempo();
+    // le clavier doit être visible sans défiler (petits écrans)
+    requestAnimationFrame(() => {
+      if (this.destroyed) return;
+      const r = this.el.kb.getBoundingClientRect();
+      if (r.bottom > innerHeight && r.height < innerHeight) this.el.kb.scrollIntoView({ block: 'end' });
+    });
   }
 
   keyLabel(m) {
@@ -1612,6 +1618,20 @@ export class Trainer {
     synth.setSustain(false);
     for (const m of this.held) synth.releaseNote(m, true);
   }
+}
+
+function readPref(k) {
+  try {
+    return globalThis.localStorage?.getItem('pianocoach.trainer.' + k) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writePref(k, v) {
+  try {
+    globalThis.localStorage?.setItem('pianocoach.trainer.' + k, v ? '1' : '0');
+  } catch {}
 }
 
 function pick(arr) {
