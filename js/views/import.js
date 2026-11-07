@@ -14,6 +14,7 @@ import { h, toast, modal, download, escapeHtml, stars } from '../ui/dom.js';
 import * as synth from '../audio/synth.js';
 import { mic } from '../audio/mic.js';
 import { midiInput, computerKeyboard } from '../audio/midi-input.js';
+import { quantize, dedupe, suggestSplitPoint, splitHands, GRIDS, toRawSong } from '../core/edit.js';
 import { ctx, main, onCleanup, registerRoute, findSong, allSongs, genreOf, levelLabel, applyTheme, section, statCard, songCard, startTrainer, settingsSections, homeSections } from '../ui/context.js';
 
 // ---------- Import ----------
@@ -87,7 +88,9 @@ function viewImport() {
     const tempo = h('input', { type: 'number', min: 20, max: 300, value: Math.round(s.tempo), class: 'num', 'aria-label': 'Tempo' });
     const genre = h('select', { 'aria-label': 'Genre' }, GENRES.map((g) => h('option', { value: g.id, selected: g.id === s.genre }, g.name)));
     const level = h('select', { 'aria-label': 'Niveau' }, [1, 2, 3, 4, 5].map((l) => h('option', { value: l, selected: l === (s.level || estimateLevel(s)) }, levelLabel(l))));
-    const split = h('label', { class: 'check' }, [h('input', { type: 'checkbox', checked: !s.hands.L }), 'Répartir les mains au Do central']);
+    const splitPt = h('input', { type: 'number', min: 36, max: 84, value: suggestSplitPoint(s.notes), class: 'num', 'aria-label': 'Point de partage des mains (numéro MIDI, 60 = Do central)', oninput: () => (splitName.textContent = noteLabel(Number(splitPt.value) || 60, ctx.settings)) });
+    const splitName = h('span', { class: 'small muted' }, noteLabel(Number(splitPt.value), ctx.settings));
+    const split = h('div', { class: 'row' }, [h('label', { class: 'check' }, [h('input', { type: 'checkbox', checked: !s.hands.L }), 'Répartir les mains à partir de']), splitPt, splitName]);
     const staffBox = h('div', { class: 'staff-box' });
     const card = h('div', { class: 'card preview' }, [
       h('h3', {}, (raw.transcribed ? '🎧 Musique transcrite' : '✅ Partition lue') + (name ? ` : ${name}` : '')),
@@ -101,9 +104,9 @@ function viewImport() {
     requestAnimationFrame(() => new StaffView(staffBox).render(s, 0, Math.min(s.totalBeats, s.beatsPerMeasure * 4), { settings: ctx.settings, showFingers: true }));
 
     function save() {
-      let notes = s.notes.map(({ midi, start, dur, hand, finger }) => ({ midi, start, dur, hand, finger: s.autoFingering ? null : finger }));
-      if (split.querySelector('input').checked) notes = notes.map((n) => ({ ...n, hand: n.midi >= 60 ? 'R' : 'L', finger: null }));
-      const out = { id: s.id, title: title.value || 'Sans titre', composer: composer.value || 'Inconnu', tempo: Number(tempo.value) || s.tempo, timeSig: s.timeSig, keyFifths: s.keyFifths || 0, genre: genre.value, level: Number(level.value), description: 'Partition importée.', notes };
+      let notes = dedupe(s.notes.map((n) => ({ ...n, finger: s.autoFingering ? null : n.finger })));
+      if (split.querySelector('input').checked) notes = splitHands(notes, Number(splitPt.value) || 60).map((n) => ({ ...n, finger: null }));
+      const out = { ...toRawSong(s, notes), id: s.id, title: title.value || 'Sans titre', composer: composer.value || 'Inconnu', tempo: Number(tempo.value) || s.tempo, timeSig: s.timeSig, keyFifths: s.keyFifths || 0, genre: genre.value, level: Number(level.value), description: 'Partition importée.' };
       if (!store.saveToLibrary(out)) return toast('Espace de stockage plein : supprime d’anciens imports.');
       ctx.prepared.delete(out.id);
       toast('Partition ajoutée ! Un cours pas à pas a été créé pour elle.');
@@ -120,66 +123,149 @@ function estimateLevel(s) {
   return Math.max(1, Math.min(5, lvl));
 }
 
-/** Enregistre ce que tu joues (MIDI, clavier, souris) et le transforme en partition. */
+/** Enregistre ce que tu joues (MIDI, clavier, souris) et le transforme en partition (vélocité et pédale conservées). */
 function recorderPanel() {
   let rec = null;
-  const status = h('span', { class: 'muted' }, 'Prêt');
+  const status = h('span', { class: 'muted', role: 'status' }, 'Prêt');
   const tempo = h('input', { type: 'number', value: 90, min: 30, max: 240, class: 'num', 'aria-label': 'Tempo' });
+  const beats = h('select', { 'aria-label': 'Mesure' }, [[4, '4/4'], [3, '3/4'], [2, '2/4']].map(([v, l]) => h('option', { value: v }, l)));
+  const gridSel = h('select', { 'aria-label': 'Quantification' }, GRIDS.map((g) => h('option', { value: g.id, selected: g.id === 'double' }, g.label)));
+  const swingChk = h('input', { type: 'checkbox', checked: true });
+  const autoSplit = h('input', { type: 'checkbox', checked: true });
+  const splitPt = h('input', { type: 'number', min: 36, max: 84, value: 60, class: 'num', 'aria-label': 'Point de partage des mains (numéro MIDI)', oninput: () => (splitName.textContent = noteLabel(Number(splitPt.value) || 60, ctx.settings)) });
+  const splitName = h('span', { class: 'small muted' }, noteLabel(60, ctx.settings));
   const kbEl = h('div', { class: 'kb small-kb' });
   const btn = h('button', { class: 'btn primary', onclick: () => (rec ? stop() : start()) }, '⏺ Enregistrer');
-  const kb = new PianoKeyboard(kbEl, { onNoteOn: (m) => on(m), onNoteOff: (m) => off(m), label: (m) => (m % 12 === 0 ? noteLabel(m, ctx.settings) : '') });
+  const kb = new PianoKeyboard(kbEl, { onNoteOn: (m) => on(m, 0.75), onNoteOff: (m) => off(m), label: (m) => (m % 12 === 0 ? noteLabel(m, ctx.settings) : '') });
   kb.setRange(48, 84);
-  const unsub = [midiInput.on((e) => (e.type === 'noteon' ? on(e.midi) : e.type === 'noteoff' && off(e.midi))), computerKeyboard.on((e) => (e.type === 'noteon' ? (on(e.midi), kb.press(e.midi)) : e.type === 'noteoff' && (off(e.midi), kb.release(e.midi))))];
-  onCleanup(() => { unsub.forEach((f) => f()); clearInterval(rec?.timer); });
+  const unsub = [
+    midiInput.on((e) => (e.type === 'noteon' ? on(e.midi, e.velocity, true) : e.type === 'noteoff' ? off(e.midi) : e.type === 'pedal' && pedal(e.down))),
+    computerKeyboard.on((e) => (e.type === 'noteon' ? (on(e.midi, e.velocity), kb.press(e.midi)) : e.type === 'noteoff' && (off(e.midi), kb.release(e.midi)))),
+  ];
+  onCleanup(() => { unsub.forEach((f) => f()); if (rec) stopMetronome(rec); rec = null; });
   midiInput.init().catch(() => {});
-  function on(m) {
-    synth.playNote(m, { dur: 3, instrument: ctx.settings.instrument });
-    if (rec) rec.open.set(m, performance.now());
+  function on(m, velocity = 0.75, fromMidi = false) {
+    if (!fromMidi || ctx.settings.midiLocalSound !== false) synth.playNote(m, { dur: 3, velocity, instrument: ctx.settings.instrument });
+    if (!rec) return;
+    if (rec.open.has(m)) off(m, true); // note rejouée sans relâchement : on clôt la précédente
+    rec.open.set(m, { t0: performance.now(), velocity });
   }
-  function off(m) {
-    synth.releaseNote(m);
+  function off(m, silent = false) {
+    if (!silent) synth.releaseNote(m);
     if (!rec || !rec.open.has(m)) return;
-    rec.notes.push({ midi: m, t0: rec.open.get(m), t1: performance.now() });
+    const o = rec.open.get(m);
+    rec.notes.push({ midi: m, t0: o.t0, t1: performance.now(), velocity: o.velocity });
     rec.open.delete(m);
   }
-  function start() {
-    const bpm = Number(tempo.value) || 90;
-    rec = { notes: [], open: new Map(), t: 0, bpm };
-    // métronome planifié au fil de l'eau (s'arrête avec l'enregistrement)
-    let beat = 0;
+  function pedal(down) {
+    synth.setSustain(down);
+    if (rec) rec.pedal.push({ t: performance.now(), down });
+  }
+  // métronome à part (gain dédié) : le couper à « Arrêter » coupe aussi les clics déjà planifiés
+  function stopMetronome(r) {
+    clearInterval(r.timer);
+    try {
+      const ac = synth.audioContext();
+      r.gain.gain.cancelScheduledValues(ac.currentTime);
+      r.gain.gain.setValueAtTime(0, ac.currentTime);
+      r.oscs.forEach((o) => { try { o.stop(); } catch {} });
+      setTimeout(() => r.gain.disconnect(), 100);
+    } catch {}
+  }
+  function clickAt(r, when, accent) {
     const ac = synth.audioContext();
-    const t0 = ac.currentTime + 0.05;
-    rec.t = performance.now() + 50 + (60000 / bpm) * 4;
-    rec.timer = setInterval(() => {
-      while (t0 + (beat * 60) / bpm < ac.currentTime + 0.2) {
-        synth.click(t0 + (beat * 60) / bpm, beat % 4 === 0);
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    o.frequency.value = accent ? 1600 : 1000;
+    g.gain.setValueAtTime(0, when);
+    g.gain.linearRampToValueAtTime(accent ? 0.5 : 0.3, when + 0.001);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
+    o.connect(g).connect(r.gain);
+    o.start(when);
+    o.stop(when + 0.06);
+    r.oscs.push(o);
+    o.onended = () => { r.oscs = r.oscs.filter((x) => x !== o); };
+  }
+  function start() {
+    const bpm = Math.max(30, Math.min(240, Number(tempo.value) || 90));
+    const perBar = Number(beats.value) || 4;
+    const ac = synth.audioContext();
+    const gain = ac.createGain();
+    gain.gain.value = ctx.settings.volume ?? 0.7;
+    gain.connect(ac.destination);
+    const t0 = ac.currentTime + 0.1;
+    // temps 1 (après une mesure de décompte), en horloge performance.now()
+    rec = { notes: [], open: new Map(), pedal: [], bpm, perBar, gain, oscs: [], t: performance.now() + 100 + (60000 / bpm) * perBar };
+    let beat = 0;
+    const r = rec;
+    r.timer = setInterval(() => {
+      while (t0 + (beat * 60) / bpm < ac.currentTime + 0.12) {
+        clickAt(r, t0 + (beat * 60) / bpm, beat % perBar === 0);
         beat++;
       }
-      status.textContent = rec.t > performance.now() ? 'Décompte…' : `⏺ ${(((performance.now() - rec.t) / 1000) | 0)} s`;
-    }, 50);
+      status.textContent = r.t > performance.now() ? `Décompte… ${Math.ceil((r.t - performance.now()) / (60000 / bpm))}` : `⏺ ${(((performance.now() - r.t) / 1000) | 0)} s`;
+    }, 25);
     btn.textContent = '⏹ Arrêter';
     btn.classList.add('danger');
   }
   function stop() {
-    clearInterval(rec.timer);
-    synth.stopAll();
-    for (const [m] of rec.open) off(m);
-    const spb = 60000 / rec.bpm;
-    const q = (x) => Math.round(x * 4) / 4;
-    // les notes jouées pendant le décompte (avant le temps 1) sont ignorées
-    const notes = rec.notes.filter((n) => n.t0 >= rec.t - spb * 0.25).map((n) => ({ midi: n.midi, start: Math.max(0, q((n.t0 - rec.t) / spb)), dur: Math.max(0.25, q((n.t1 - n.t0) / spb)), hand: n.midi >= 60 ? 'R' : 'L' }));
+    const r = rec;
+    stopMetronome(r);
+    for (const [m] of [...r.open]) off(m);
+    synth.setSustain(false);
+    rec = null;
     btn.textContent = '⏺ Enregistrer';
     btn.classList.remove('danger');
-    status.textContent = `${notes.length} notes enregistrées`;
-    const bpm = rec.bpm;
-    rec = null;
-    if (!notes.length) return toast('Rien enregistré : joue sur un clavier MIDI, le clavier de l’ordinateur ou les touches ci-dessous.');
+    const raw = recordingToSong(r, {
+      grid: (GRIDS.find((g) => g.id === gridSel.value) || GRIDS[2]).value,
+      swing: swingChk.checked ? 'auto' : false,
+      splitPoint: autoSplit.checked ? null : Number(splitPt.value) || 60,
+    });
+    status.textContent = `${raw.notes.length} notes enregistrées${raw.swing ? ' · swing détecté' : ''}`;
+    if (!raw.notes.length) return toast('Rien enregistré : joue sur un clavier MIDI, le clavier de l’ordinateur ou les touches ci-dessous.');
     const id = 'rec-' + Date.now().toString(36);
-    store.saveToLibrary({ id, title: 'Mon enregistrement ' + new Date().toLocaleString('fr-FR'), composer: 'Moi', tempo: bpm, timeSig: [4, 4], genre: 'pop', level: 1, description: 'Créé en jouant.', notes });
-    toast('Enregistrement ajouté à ta bibliothèque !');
+    store.saveToLibrary({ id, title: 'Mon enregistrement ' + new Date().toLocaleString('fr-FR'), composer: 'Moi', genre: 'pop', level: 1, description: 'Créé en jouant.', ...raw });
+    toast('Enregistrement ajouté à ta bibliothèque ! Tu peux le corriger avec « Modifier ».');
     location.hash = '#/morceau/' + id;
   }
-  return [h('p', { class: 'small' }, 'Joue une mélodie (clavier MIDI, clavier d’ordinateur ou souris) : l’app l’enregistre au métronome (1 mesure de décompte) et en fait une partition avec doigtés.'), h('div', { class: 'row' }, [btn, h('label', { class: 'field' }, ['Tempo ', tempo]), status]), kbEl];
+  return [
+    h('p', { class: 'small' }, 'Joue une mélodie (clavier MIDI, clavier d’ordinateur ou souris) : l’app l’enregistre au métronome (1 mesure de décompte) et en fait une partition avec doigtés. La vélocité et la pédale du clavier MIDI sont conservées.'),
+    h('div', { class: 'row wrap' }, [btn, h('label', { class: 'field' }, ['Tempo ', tempo]), h('label', { class: 'field' }, ['Mesure ', beats]), status]),
+    h('div', { class: 'row wrap' }, [
+      h('label', { class: 'field' }, ['Quantifier en ', gridSel]),
+      h('label', { class: 'check' }, [swingChk, 'détecter le swing']),
+      h('label', { class: 'check' }, [autoSplit, 'partage des mains automatique']),
+      h('label', { class: 'field' }, ['sinon à partir de ', splitPt]), splitName,
+    ]),
+    kbEl,
+  ];
+}
+
+/**
+ * Enregistrement brut (temps en ms) -> morceau : quantification, pas de notes empilées au début,
+ * vélocités et pédale conservées. Exporté pour les tests.
+ */
+export function recordingToSong(r, { grid = 0.25, swing = 'auto', splitPoint = null } = {}) {
+  const spb = 60000 / r.bpm;
+  const toBeat = (t) => (t - r.t) / spb;
+  // les notes jouées pendant le décompte (bien avant le temps 1) sont ignorées : rien d'empilé à 0
+  const rawNotes = r.notes
+    .filter((n) => toBeat(n.t0) >= -0.25 && n.t1 > n.t0)
+    .map((n) => ({ midi: n.midi, start: Math.max(0, toBeat(n.t0)), dur: Math.max(0.05, (n.t1 - n.t0) / spb), hand: 'R', finger: null, velocity: Math.round((n.velocity ?? 0.75) * 127) }));
+  const q = quantize(rawNotes, { grid, swing });
+  const sp = splitPoint ?? suggestSplitPoint(q.notes);
+  const notes = splitHands(q.notes, sp).map(({ id, ...n }) => n);
+  const pedal = [];
+  for (const p of r.pedal || []) {
+    const beat = Math.max(0, Math.round(toBeat(p.t) * 4) / 4);
+    if (toBeat(p.t) < -0.25) continue;
+    if (pedal.length && pedal[pedal.length - 1].down === p.down) continue;
+    pedal.push({ beat, down: p.down });
+  }
+  const out = { tempo: r.bpm, timeSig: [r.perBar || 4, 4], notes };
+  if (pedal.length) out.pedal = pedal;
+  if (q.swing) out.swing = true;
+  return out;
 }
 
 registerRoute(/^importer$/, viewImport)

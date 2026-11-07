@@ -112,9 +112,43 @@ export function songKey(song) {
   return { fifths, mode };
 }
 
-/** Orthographe d'une note : celle du fichier d'origine si elle est cohérente, sinon tonale. */
-export function spellNote(note, key = { fifths: 0, mode: 'major' }) {
-  return spellFrom(note.midi, note.spelling) || spell(note.midi, key.fifths || 0, key.mode || 'major');
+/**
+ * Orthographe d'une note : celle du fichier d'origine si elle est cohérente, sinon tonale.
+ * @param {number} [dir] sens chromatique vers la note suivante (cf. melodicDirections)
+ */
+export function spellNote(note, key = { fifths: 0, mode: 'major' }, dir = 0) {
+  return spellFrom(note.midi, note.spelling) || spell(note.midi, key.fifths || 0, key.mode || 'major', dir);
+}
+
+/**
+ * Sens du mouvement chromatique de chaque note vers la suivante de la même main :
+ * +1 si la note suivante est un demi-ton au-dessus, -1 un demi-ton au-dessous, 0 sinon.
+ * @returns {Map<any, number>} id (ou index) → sens
+ */
+export function melodicDirections(notes) {
+  const res = new Map();
+  for (const hand of ['R', 'L']) {
+    const list = notes.map((n, i) => [n, i]).filter(([n]) => (n.hand === 'L' ? 'L' : 'R') === hand).sort((a, b) => a[0].start - b[0].start);
+    const starts = [...new Set(list.map(([n]) => Math.round(n.start * 1000)))];
+    const byStart = new Map();
+    for (const [n] of list) {
+      const k = Math.round(n.start * 1000);
+      if (!byStart.has(k)) byStart.set(k, new Set());
+      byStart.get(k).add(n.midi);
+    }
+    const nextOf = new Map(starts.map((s, i) => [s, starts[i + 1]]));
+    for (const [n, i] of list) {
+      const nx = nextOf.get(Math.round(n.start * 1000));
+      const set = nx != null ? byStart.get(nx) : null;
+      let dir = 0;
+      if (set) {
+        if (set.has(n.midi + 1) && !set.has(n.midi - 1)) dir = 1;
+        else if (set.has(n.midi - 1) && !set.has(n.midi + 1)) dir = -1;
+      }
+      res.set(n.id ?? i, dir);
+    }
+  }
+  return res;
 }
 
 // ---------------------------------------------------------------------------
@@ -398,7 +432,8 @@ export function flagCount(type) {
 
 /**
  * Groupes de ligature : croches et plus courtes consécutives d'une même voix, dans un même temps.
- * @param {Array<{start, dur, type, voice?, rest?}>} events triés par temps (une entrée par accord)
+ * @param {Array<{start, dur, type, voice?, rest?, group?}>} events triés par temps (une entrée par accord) ;
+ *        `group` (facultatif) force le regroupement (ex. un triolet entier)
  * @param {object} o {beat: durée du temps, measureLen}
  * @returns {number[][]} groupes (indices) d'au moins deux événements
  */
@@ -431,7 +466,7 @@ export function beamGroups(events, o = {}) {
       }
       const measure = Math.floor(e.start / mLen + 1e-6);
       const span = e.tuplet ? Math.max(beat, e.dur * 3) : beat;
-      const beatIdx = Math.floor((e.start - measure * mLen) / span + 1e-6);
+      const beatIdx = e.group != null ? `g${e.group}` : Math.floor((e.start - measure * mLen) / span + 1e-6);
       const key = `${measure}:${beatIdx}:${e.tuplet ? 't' : 's'}`;
       if (curKey !== key || (prevEnd != null && Math.abs(prevEnd - e.start) > 1e-3)) flush();
       cur.push(i);

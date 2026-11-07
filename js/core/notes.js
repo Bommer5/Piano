@@ -148,9 +148,11 @@ function fromStepAlter(midi, step, alter) {
  * @param {number} midi
  * @param {number} keyFifths armure (-7..7)
  * @param {'major'|'minor'|string} keyMode
+ * @param {number} [dir] mouvement mélodique vers la note suivante (+1 : monte d'un demi-ton → dièse,
+ *        -1 : descend → bémol) ; ne sert que pour les notes chromatiques
  * @returns {number} position sur la ligne des quintes
  */
-export function tonalLof(midi, keyFifths = 0, keyMode = 'major') {
+export function tonalLof(midi, keyFifths = 0, keyMode = 'major', dir = 0) {
   const pc = pitchClass(midi);
   const f = Math.round(keyFifths) || 0;
   const base = (pc * 7) % 12; // lof ≡ base (mod 12)
@@ -167,6 +169,11 @@ export function tonalLof(midi, keyFifths = 0, keyMode = 'major') {
   // 3. chromatisme : la plus proche du centre de la tonalité (moins d'altérations en cas d'égalité)
   const center = f + 2;
   cands.sort((a, b) => Math.abs(a - center) - Math.abs(b - center) || Math.abs(Math.floor((a + 1) / 7)) - Math.abs(Math.floor((b + 1) / 7)) || a - b);
+  if (dir) {
+    // note de passage chromatique : dièse en montant (Mi Ré♯ Mi), bémol en descendant
+    const two = cands.slice(0, 2).filter((l) => Math.abs(Math.floor((l + 1) / 7)) <= 1 + Math.abs(Math.floor((f + 1) / 7)));
+    if (two.length === 2) return dir > 0 ? Math.max(...two) : Math.min(...two);
+  }
   return cands[0];
 }
 
@@ -174,11 +181,12 @@ export function tonalLof(midi, keyFifths = 0, keyMode = 'major') {
  * Position diatonique (pour la portée). Renvoie {step: 0..6 (C..B), octave, alter, diatonic}.
  * Deux formes :
  *   spell(midi, preferFlats)            — ancienne forme : dièses ou bémols systématiques ;
- *   spell(midi, keyFifths, keyMode)     — orthographe tonale (armure -7..7, mode 'major'|'minor').
+ *   spell(midi, keyFifths, keyMode[, dir]) — orthographe tonale (armure -7..7, mode 'major'|'minor',
+ *                                          dir = sens de la note suivante pour les chromatismes).
  */
-export function spell(midi, keyOrFlats = false, keyMode) {
+export function spell(midi, keyOrFlats = false, keyMode, dir = 0) {
   if (typeof keyOrFlats === 'number' && Number.isFinite(keyOrFlats)) {
-    const { step, alter } = lofToSpelling(tonalLof(midi, keyOrFlats, keyMode || 'major'));
+    const { step, alter } = lofToSpelling(tonalLof(midi, keyOrFlats, keyMode || 'major', dir));
     return fromStepAlter(midi, step, alter);
   }
   const pc = pitchClass(midi);

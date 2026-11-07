@@ -105,13 +105,25 @@ function audioSection() {
     syncOld(val);
     updateLocalHelp();
   });
+  const oldLocal = () => findMainControl(root, (el) => el.type === 'checkbox' && /clavier MIDI/i.test(el.closest('label')?.textContent || ''));
+  let syncing = false;
   const syncOld = (val) => {
-    const old = findMainControl(root, (el) => el.type === 'checkbox' && /clavier MIDI/i.test(el.closest('label')?.textContent || ''));
+    const old = oldLocal();
     if (old && old.checked !== val) {
+      syncing = true;
       old.checked = val;
       old.dispatchEvent(new Event('change', { bubbles: true }));
+      syncing = false;
     }
   };
+  // la case « Son de l'app pour le clavier MIDI » de la section Son devient un choix manuel
+  setTimeout(() => oldLocal()?.addEventListener('change', (e) => {
+    if (syncing) return;
+    const v = e.target.checked ? 'on' : 'off';
+    saveAudio({ midiLocalSoundMode: v });
+    localMode.value = v;
+    updateLocalHelp();
+  }));
 
   // ----- sortie MIDI -----
   const outDev = h('select', { onchange: (e) => saveAudio({ midiOutId: e.target.value || null }) });

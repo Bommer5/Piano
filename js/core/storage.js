@@ -324,7 +324,7 @@ export const store = {
   },
   /** Accueil guidé déjà fait (ou désactivé globalement par `pianocoach.onboarded`). */
   isOnboarded() {
-    return !!this.settings().onboarded || !!rawRead(PREFIX + 'onboarded', false);
+    return !!store.settings().onboarded || !!rawRead(PREFIX + 'onboarded', false);
   },
 
   // ---------- progrès ----------
@@ -346,7 +346,7 @@ export const store = {
     const today = localDate();
     days[today] = (days[today] || 0) + (result.durationSec || 0);
     write('days', days);
-    const newBadges = this.checkBadges();
+    const newBadges = store.checkBadges();
     return { ...p, newBadges };
   },
   practiceDays() {
@@ -366,7 +366,7 @@ export const store = {
     if (done) l[id] = Date.now();
     else delete l[id];
     write('lessons', l);
-    if (done) this.checkBadges();
+    if (done) store.checkBadges();
   },
   library() {
     return read('library', []);
@@ -375,7 +375,7 @@ export const store = {
     const lib = read('library', []).filter((s) => s.id !== song.id);
     lib.push(song);
     const ok = write('library', lib);
-    if (ok) this.checkBadges();
+    if (ok) store.checkBadges();
     return ok;
   },
   removeFromLibrary(id) {
@@ -397,19 +397,19 @@ export const store = {
     return read('badges', {});
   },
   stats() {
-    const s = this.settings();
-    return computeStats({ progress: read('progress', {}), days: read('days', {}), lessons: read('lessons', {}), library: read('library', []), goalMin: s.dailyGoalMin, streak: this.streakInfo() });
+    const s = store.settings();
+    return computeStats({ progress: read('progress', {}), days: read('days', {}), lessons: read('lessons', {}), library: read('library', []), goalMin: s.dailyGoalMin, streak: store.streakInfo() });
   },
   /** Vérifie les badges, enregistre et annonce (événement `pianocoach:badge`) les nouveaux. */
   checkBadges() {
     const earned = read('badges', {});
-    const ids = findNewBadges(this.stats(), earned);
+    const ids = findNewBadges(store.stats(), earned);
     if (!ids.length) return [];
     const now = Date.now();
     for (const id of ids) earned[id] = now;
     write('badges', earned);
     const list = ids.map((id) => BADGES.find((b) => b.id === id));
-    for (const badge of list) emit('pianocoach:badge', { badge, profile: this.currentProfile() });
+    for (const badge of list) emit('pianocoach:badge', { badge, profile: store.currentProfile() });
     return list;
   },
 
@@ -420,7 +420,7 @@ export const store = {
     return st && st.date === localDate() ? st : { date: localDate(), done: [] };
   },
   setPlanStep(id, done = true) {
-    const st = this.planState();
+    const st = store.planState();
     const set = new Set(st.done);
     done ? set.add(id) : set.delete(id);
     write('plan', { date: st.date, done: [...set] });
@@ -441,7 +441,7 @@ export const store = {
   // ---------- sauvegarde ----------
   /** Exporte les données du profil courant (+ bibliothèque partagée). */
   exportAll() {
-    const out = { version: 2, profile: { ...this.currentProfile() } };
+    const out = { version: 2, profile: { ...store.currentProfile() } };
     for (const k of [...PROFILE_KEYS, ...SHARED_KEYS]) out[k] = read(k, null);
     return out;
   },

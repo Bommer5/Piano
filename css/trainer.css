@@ -1,0 +1,93 @@
+/* Entraîneur avancé : modes Imiter / Concert / Par cœur, revue de prise, rapport, mode enfant. */
+.trainer .seg-modes { flex-wrap: wrap; }
+.trainer .controls .row { flex-wrap: wrap; }
+.trainer .field { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.trainer .kid-tempo { display: none; }
+.fb-wrap { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
+.fb-wrap .feedback { flex: 1; min-width: 0; }
+
+/* Imiter : indicateur Écoute / À toi */
+.imitate-turn { display: grid; place-items: center; padding: 6px 14px; border-radius: 12px; font-weight: 800; font-size: 1.1rem; border: 2px solid var(--line); background: var(--card); white-space: nowrap; }
+.imitate-turn.listen { border-color: var(--accent); color: var(--accent); }
+.imitate-turn.play { border-color: var(--ok); color: var(--ok); animation: turnPulse 1.2s ease-in-out infinite; }
+.imitate-turn.done { color: var(--ok); }
+@keyframes turnPulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--ok) 25%, transparent); } }
+
+/* Revue de prise (superposition + barre de défilement) */
+.review-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: var(--card); border: 1px solid var(--accent); border-radius: var(--radius); padding: 8px 12px; margin: 0 0 8px; }
+.review-bar .review-title { font-weight: 800; }
+.review-scrub { flex: 1 1 180px; min-width: 120px; }
+.review-legend { display: inline-flex; gap: 4px; align-items: center; color: var(--muted); }
+.review-legend .lg { display: inline-block; width: 12px; height: 10px; border-radius: 3px; border: 2px solid; margin-left: 6px; }
+.review-legend .lg.ok { border-color: var(--ok); }
+.review-legend .lg.off { border-color: var(--warn); }
+.review-legend .lg.bad { border-color: #9aa0a6; border-style: dashed; }
+
+/* Fenêtre de résultat */
+.take-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 10px; }
+.btn.small { padding: 6px 10px; font-size: 0.9rem; }
+
+/* Par cœur */
+.staff .memo-mask { fill: var(--bg2); opacity: 0.97; }
+.staff .memo-mask-label { font-size: 26px; text-anchor: middle; opacity: 0.5; }
+
+/* Revoir mes erreurs */
+dialog.modal.report-dlg { width: min(760px, 96vw); max-height: 92vh; overflow: auto; }
+.rv-staff { border-radius: 10px; margin: 6px 0; min-height: 0; }
+.rv-ok { color: var(--ok); } .rv-bad { color: var(--bad); } .rv-extra { color: #9aa0a6; }
+.staff .extra-note ellipse { fill: #9aa0a6; stroke: #9aa0a6; opacity: 0.85; }
+.staff .extra-note text { fill: #9aa0a6; font-size: 15px; }
+
+/* Rapport */
+.rep-sec { margin: 12px 0; }
+.rep-sec h3 { margin: 0 0 6px; font-size: 1rem; }
+.rep-chart { width: 100%; height: auto; display: block; }
+.rep-bg { fill: var(--bg2); }
+.rep-grid { stroke: var(--grid); stroke-width: 1; }
+.rep-axis { stroke: var(--muted); stroke-width: 1; opacity: 0.7; }
+.rep-lbl { fill: var(--muted); font-size: 11px; font-weight: 700; }
+.rep-lbl.small { font-size: 9px; font-weight: 400; }
+.rep-dot.ok { fill: var(--ok); }
+.rep-dot.off { fill: var(--warn); }
+.rep-bar { fill: var(--accent); opacity: 0.75; }
+.rep-bar.ok { fill: var(--ok); }
+.rep-bar.late { fill: var(--hand-l); }
+.rep-bar.early { fill: var(--hand-r); }
+.rep-list { margin: 4px 0; padding-left: 20px; font-size: 0.9rem; }
+.shortcuts { border-collapse: collapse; width: 100%; }
+.shortcuts td { padding: 4px 8px; border-bottom: 1px solid var(--line); }
+.shortcuts td:first-child { white-space: nowrap; }
+
+/* Concert */
+.trainer .concert-bar, .trainer .concert-end { display: none; }
+.trainer.concert .controls, .trainer.concert .progress, .trainer.concert .hud, .trainer.concert .hint-line, .trainer.concert .kb, .trainer.concert .roll-wrap, .trainer.concert .review-bar { display: none; }
+.trainer.concert .concert-bar { display: flex; gap: 8px; align-items: center; justify-content: flex-end; padding: 6px 10px; opacity: 0.35; transition: opacity 0.2s; }
+.trainer.concert .concert-bar:hover, .trainer.concert .concert-bar:focus-within { opacity: 1; }
+.trainer.concert .concert-title { margin-right: auto; font-weight: 700; color: var(--muted); }
+.trainer.concert .staff-wrap { border: 0; }
+.trainer.concert .staff { width: 100%; height: auto; }
+.trainer.concert.fullscreen { background: var(--bg); padding: 12px; overflow: auto; }
+.trainer.concert.fullscreen .stage { min-height: calc(100vh - 24px); display: flex; flex-direction: column; justify-content: center; }
+.trainer.concert .concert-end:not(.hidden) { display: block; position: absolute; left: 12px; right: 12px; bottom: 12px; background: var(--card2); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; font-size: 0.9rem; box-shadow: var(--shadow); }
+.trainer.concert .concert-end p { margin: 0 0 6px; }
+
+/* Mode enfant */
+.trainer.kid { font-size: 1.12rem; }
+.trainer.kid .controls .row.adv { display: none; }
+.trainer.kid .kid-tempo { display: flex; gap: 10px; }
+.trainer.kid .kid-speed { font-size: 1.8rem; padding: 6px 16px; border-radius: 16px; }
+.trainer.kid .kid-speed.on { outline: 3px solid var(--accent); background: color-mix(in srgb, var(--accent) 22%, var(--card)); }
+.trainer.kid .feedback { font-size: 1.4rem; }
+.trainer.kid .detected { display: none; }
+.trainer.kid .piano .key { --kc: var(--hand-r); }
+.trainer.kid .piano .key.white { box-shadow: inset 0 -10px 0 color-mix(in srgb, var(--kc) 70%, transparent); }
+.trainer.kid .piano .key.black { box-shadow: inset 0 -6px 0 color-mix(in srgb, var(--kc) 80%, transparent); }
+.trainer.kid .piano .key.expect-R, .trainer.kid .piano .key.expect-L { background: var(--kc) !important; }
+.trainer.kid .piano .key .label { font-size: 0.8rem; font-weight: 800; }
+.confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 1000; }
+
+@media (max-width: 760px) {
+  .fb-wrap { flex-direction: column; }
+  .trainer .seg-btn { padding: 6px 8px; }
+  .review-legend { display: none; }
+}

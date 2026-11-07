@@ -9,7 +9,7 @@
 import { noteLabel } from '../core/notes.js';
 import {
   songKey, spellNote, assignStaves, splitNote, snapTime, snapDuration, restsInMeasure, mergeIntervals,
-  computeAccidentals, beamGroups, tupletGroups, flagCount, beatUnit, measureNumber, keySignatureAlters,
+  computeAccidentals, beamGroups, melodicDirections, tupletGroups, flagCount, beatUnit, measureNumber, keySignatureAlters,
 } from '../core/notation.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -108,7 +108,7 @@ function verticalLayout(song, staves, opts) {
     else { minB = Math.min(minB, d); maxB = Math.max(maxB, d); }
   }
   let top = 6 + (opts.tempo ? 14 : 0) + (opts.chords ? 16 : 0);
-  const TT = top + Math.min(80, Math.max(34, (maxT - 38) * HS + 36));
+  const TT = top + Math.min(80, Math.max(40, (maxT - 38) * HS + 48));
   const TB = TT + 4 * GAP;
   const between = Math.min(110, Math.max(70, (30 - minT) * HS + (maxB - 26) * HS + 40));
   const BT = TB + between;
@@ -122,10 +122,10 @@ function verticalLayout(song, staves, opts) {
 function stavesOf(song) {
   let s = staffCache.get(song);
   if (!s || s.n !== song.notes) {
-    s = { n: song.notes, map: assignStaves(song.notes) };
+    s = { n: song.notes, map: assignStaves(song.notes), dirs: melodicDirections(song.notes) };
     staffCache.set(song, s);
   }
-  return s.map;
+  return s;
 }
 
 export class StaffView {
@@ -153,7 +153,7 @@ export class StaffView {
     const beat = beatUnit(song.timeSig);
     const pickup = song.pickupBeats > EPS ? song.pickupBeats : 0;
     const key = songKey(song);
-    const staves = stavesOf(song);
+    const { map: staves, dirs } = stavesOf(song);
     const hidden = opts.hiddenMeasures instanceof Set ? opts.hiddenMeasures : null;
     const mNum = (b) => measureNumber(b, bpm, pickup);
     const isHidden = (b) => !!hidden && hidden.has(mNum(b));
@@ -177,7 +177,7 @@ export class StaffView {
       const d0 = snapDuration(n.dur);
       if (s0 >= to - EPS || s0 + d0 <= from + EPS) continue;
       const clef = staves.get(n.id) || (n.hand === 'L' ? 'bass' : 'treble');
-      const sp = spellNote(n, key);
+      const sp = spellNote(n, key, dirs.get(n.id) || 0);
       const parts = splitNote(s0, d0, bpm);
       const list = [];
       parts.forEach((p, i) => {
@@ -235,12 +235,15 @@ export class StaffView {
     for (const clef of ['treble', 'bass']) {
       const evs = chords.filter((c) => c.clef === clef && !c.hidden);
       const evData = evs.map((c) => ({ start: c.start, dur: c.dur, type: c.type, tuplet: c.tuplet, voice: `${c.voice}|${c.hand}` }));
+      tupletGroups(evData).forEach((g, gi) => {
+        tuplets.push(g.map((i) => evs[i]));
+        for (const i of g) evData[i].group = gi;
+      });
       for (const g of beamGroups(evData, { beat, measureLen: bpm })) {
         const grp = g.map((i) => evs[i]);
         beams.push(grp);
         for (const c of grp) beamed.add(c);
       }
-      for (const g of tupletGroups(evData)) tuplets.push(g.map((i) => evs[i]));
     }
     // direction commune pour un groupe ligaturé (voix unique)
     for (const grp of beams) {
@@ -308,7 +311,7 @@ export class StaffView {
     const charW = 6.2;
     for (const c of chords) {
       const a = anchor(c.start);
-      a.L = Math.max(a.L, 8 + c.accCols * 9 + c.leftShift + (c.heads.some((h) => h.acc?.courtesy) ? 6 : 0));
+      a.L = Math.max(a.L, 8 + c.accCols * 9 + c.leftShift + (c.heads.some((h) => h.acc?.courtesy) ? 16 : 0));
       let r = 8 + c.rightShift + (c.dots ? 7 : 0) + (c.up && flagCount(c.type) && !beamed.has(c) ? 8 : 0);
       if (opts.showNoteNames) r = Math.max(r, 13);
       a.R = Math.max(a.R, r);
@@ -453,7 +456,7 @@ export class StaffView {
       if (ng) return ng;
       const inactive = opts.activeHands && opts.activeHands !== 'both' && opts.activeHands !== n.hand;
       ng = el('g', { class: `note hand-${n.hand}` + (inactive ? ' inactive' : '') }, notesG);
-      const sp = spellNote(n, key);
+      const sp = spellNote(n, key, dirs.get(n.id) || 0);
       const label = `${noteLabel(n.midi, settings, sp)} – doigt ${n.finger || '?'} (${n.hand === 'L' ? 'main gauche' : 'main droite'})`;
       el('title', {}, ng).textContent = label;
       if (typeof opts.onNoteClick === 'function') {

@@ -58,7 +58,17 @@ export function estimateKey(notes) {
  */
 export function songKey(song) {
   const notes = song.notes || [];
-  const ranked = rankKeys(notes);
+  // profil des notes, enrichi des symboles d'accords de la partition s'il y en a
+  const prof = pitchProfile(notes);
+  if (Array.isArray(song.chords)) {
+    for (const c of song.chords) {
+      const p = parseChord(c.symbol);
+      if (!p) continue;
+      for (const pc of p.pcs) prof[pc] += 1;
+      prof[p.root] += 1;
+    }
+  }
+  const ranked = rankKeys(prof);
   if (!notes.length) return { ...keyFromFifths(song.keyFifths || 0, song.keyMode === 'minor' ? 'minor' : 'major'), source: 'armure', score: 0 };
   const best = ranked[0];
   const hasSig = song.keyFifths != null;
@@ -74,7 +84,7 @@ export function songKey(song) {
     if (!song.keyMode && last != null && last === maj.tonic && sMaj > sMin - 0.1) mode = 'major';
     const s = mode === 'minor' ? sMin : sMaj;
     // armure absente (0 par défaut) mais notes clairement dans une autre tonalité : on garde l'estimation
-    if (fifths !== 0 || s >= best.score - 0.12) return { ...keyFromFifths(fifths, mode), score: s, source: 'armure' };
+    if (fifths !== 0 || song.keyMode || s >= best.score - 0.12) return { ...keyFromFifths(fifths, mode), score: s, source: 'armure' };
   }
   return { ...best, source: 'estimation' };
 }
@@ -245,7 +255,8 @@ export function findCadences(chords, key, { phraseLength = 4, measureCount = nul
     if (endM < 0) continue;
     if (db.rel === 7 && !db.rn.secondary && endM !== last) {
       const dn = next ? deg(next) : null;
-      if (!dn || dn.rel !== 0 || next.measure > endM + 1) res.push({ type: 'demi-cadence', measure: b.measure, from: a?.symbol ?? '', to: b.symbol, label: `Demi-cadence (repos sur V) mesure ${endM + 1}` });
+      // V en fin de phrase complète, ou en fin de demi-phrase sans résolution immédiate sur I
+      if ((endM + 1) % phraseLength === 0 || !dn || dn.rel !== 0 || next.measure > endM + 1) res.push({ type: 'demi-cadence', measure: b.measure, from: a?.symbol ?? '', to: b.symbol, label: `Demi-cadence (repos sur V) mesure ${endM + 1}` });
       continue;
     }
     if (!a) continue;
@@ -253,6 +264,8 @@ export function findCadences(chords, key, { phraseLength = 4, measureCount = nul
     if (!da) continue;
     const span = a.measure === b.measure ? `mesure ${b.measure + 1}` : `mesures ${a.measure + 1}–${b.measure + 1}`;
     const isV = da.rel === 7 && !da.rn.secondary;
+    // un V posé en fin de phrase complète est une demi-cadence : le I suivant ouvre une nouvelle phrase
+    if (isV && a.endMeasure >= 0 && (a.endMeasure + 1) % phraseLength === 0 && a.endMeasure !== b.measure) continue;
     if ((isV || (da.rel === 11 && /°|ø/.test(da.rn.roman))) && db.rel === 0) {
       res.push({ type: 'parfaite', measure: b.measure, from: a.symbol, to: b.symbol, label: `Cadence parfaite (V → I) ${span}` });
     } else if (da.rel === 5 && db.rel === 0) {

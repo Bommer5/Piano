@@ -2,7 +2,7 @@
 import { store } from './core/storage.js';
 import * as synth from './audio/synth.js';
 import { computerKeyboard } from './audio/midi-input.js';
-import { h } from './ui/dom.js';
+import { h, toast } from './ui/dom.js';
 import { ctx, main, routes, applyTheme, findSong } from './ui/context.js';
 import './views/index.js';
 
@@ -55,6 +55,9 @@ window.addEventListener('keydown', () => synth.audioContext(), { once: true });
 // Mode hors-ligne (PWA) si disponible
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('sw.js').catch(() => {});
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    if (e.data?.type === 'pianocoach:update') toast('Nouvelle version disponible : recharge la page pour en profiter.', 6000);
+  });
 }
 
 // Exposé pour le débogage et les tests automatisés

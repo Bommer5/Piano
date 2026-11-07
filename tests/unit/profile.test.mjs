@@ -61,6 +61,7 @@ test('profils séparés, bibliothèque partagée, export/import par profil', () 
   assert.deepEqual(store.favorites(), []);
   assert.equal(store.library().length, 1, 'bibliothèque partagée');
   store.recordSession('s1', { score: 90, stars: 2, mode: 'wait', hands: 'R', tempoPct: 100, durationSec: 30 });
+  store.saveSettings({ ...store.settings(), notation: 'en' });
   const dump = store.exportAll();
   assert.equal(dump.profile.name, 'Léo');
   assert.ok(dump.progress.s1);
@@ -69,7 +70,8 @@ test('profils séparés, bibliothèque partagée, export/import par profil', () 
   assert.deepEqual(store.favorites(), ['a']);
   store.importAll(dump);
   assert.equal(store.progress().s1.best, 90);
-  assert.ok(store.settings().onboarded);
+  assert.ok(store.settings().onboarded, 'import : pas d’accueil guidé');
+  assert.equal(store.settings().notation, 'en');
   assert.ok(store.removeProfile('leo-2'));
   assert.equal(store.profiles().length, 2);
   // global : pianocoach.onboarded

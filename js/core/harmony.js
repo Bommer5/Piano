@@ -451,7 +451,7 @@ export function diatonicChord(key, degree, { seventh = false, flats } = {}) {
 
 /** Degré romain -> symbole d'accord dans une tonalité (« ii7 » en Do -> « Dm7 »). */
 export function romanToChord(roman, key) {
-  const m = String(roman).match(/^([♭b♯#]?)(i{1,3}|iv|v|vi{0,2}|I{1,3}|IV|V|VI{0,2})(.*)$/);
+  const m = String(roman).match(/^([♭b♯#]?)(vii|vi|iv|v|iii|ii|i|VII|VI|IV|V|III|II|I)(.*)$/);
   if (!m) return null;
   const deg = ROMAN.indexOf(m[2].toUpperCase()) + 1;
   const acc = m[1] === '♭' || m[1] === 'b' ? -1 : m[1] ? 1 : 0;

@@ -1,0 +1,166 @@
+/* Jeux et formation musicale : hub, Note Flash, rythme, oreille */
+
+/* ---------- hub ---------- */
+.games-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); margin: 14px 0; }
+.game-card {
+  --c: var(--accent); position: relative; display: flex; flex-direction: column; gap: 6px; padding: 18px; border-radius: var(--radius);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--c) 26%, var(--card)), var(--card) 70%); border: 1px solid color-mix(in srgb, var(--c) 35%, var(--line));
+  color: var(--text); text-decoration: none; overflow: hidden; transition: transform 0.18s, box-shadow 0.2s;
+  animation: gameIn 0.5s ease-out both; animation-delay: calc(var(--i, 0) * 0.08s);
+}
+.game-card:hover, .game-card:focus-visible { transform: translateY(-4px); box-shadow: var(--shadow); }
+.game-card p { margin: 0; }
+.game-title { font-size: 1.2rem; }
+.game-why { font-size: 0.82rem; }
+.game-best { align-self: flex-start; margin-top: auto; }
+.game-icon { font-size: 2.2rem; line-height: 1; display: inline-block; width: fit-content; }
+.anim-flash .game-icon { animation: gFlash 2.4s ease-in-out infinite; }
+.anim-scroll .game-icon { animation: gScroll 3s ease-in-out infinite; }
+.anim-beat .game-icon { animation: gBeat 0.86s ease-in-out infinite; }
+.anim-wave .game-icon { animation: gWave 2.6s ease-in-out infinite; transform-origin: 70% 80%; }
+@keyframes gameIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes gFlash { 0%, 80%, 100% { transform: none; filter: none; } 85% { transform: scale(1.25) rotate(-8deg); filter: drop-shadow(0 0 8px var(--warn)); } }
+@keyframes gScroll { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(8px); } }
+@keyframes gBeat { 0%, 100% { transform: scale(1); } 12% { transform: scale(1.18); } }
+@keyframes gWave { 0%, 60%, 100% { transform: rotate(0); } 70% { transform: rotate(-12deg); } 80% { transform: rotate(10deg); } }
+.games-tips { display: grid; gap: 8px; padding-left: 1.2em; }
+
+.games-teaser {
+  display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: var(--radius); text-decoration: none; color: var(--text);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--accent2) 22%, var(--card)), var(--card)); border: 1px solid var(--line); margin: 12px 0;
+}
+.games-teaser:hover { box-shadow: var(--shadow); }
+.teaser-icons { display: flex; gap: 2px; font-size: 1.5rem; }
+.teaser-icons span { display: inline-block; animation: gBeat 1.6s ease-in-out infinite; animation-delay: calc(var(--i) * 0.2s); }
+.teaser-text { display: grid; flex: 1; min-width: 0; }
+.teaser-text small { color: var(--muted); }
+
+/* ---------- niveaux ---------- */
+.level-pick { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.lvl-btn {
+  display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; text-align: left; min-width: 0; max-width: 100%;
+  padding: 7px 12px; border-radius: 11px; border: 1px solid var(--line); background: var(--card2); color: var(--text); font: inherit; cursor: pointer;
+}
+.lvl-btn b { grid-row: span 2; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--bg2); font-size: 0.9rem; }
+.lvl-btn span { font-weight: 600; font-size: 0.9rem; }
+.lvl-btn small { color: var(--muted); font-size: 0.75rem; }
+.lvl-btn.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, var(--card2)); }
+.lvl-btn.on b { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+.lvl-btn.locked { opacity: 0.45; cursor: not-allowed; }
+
+.game-setup h2 { margin-top: 0.8em; }
+.game-setup hr.sep, hr.sep { border: 0; border-top: 1px solid var(--line); margin: 18px 0 4px; }
+.warn-chip { border-color: color-mix(in srgb, var(--warn) 50%, transparent); margin: 2px; }
+.result-card { text-align: center; }
+.result-card .row { justify-content: center; }
+.big-score { font-size: clamp(2.2rem, 8vw, 3.2rem); font-weight: 900; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.big-stars { font-size: 2rem; color: var(--warn); letter-spacing: 4px; }
+.unlock { font-weight: 700; color: var(--ok); animation: pop 0.6s ease-out; }
+
+/* ---------- Note Flash ---------- */
+.game-stage { display: grid; gap: 10px; }
+.time-bar { height: 8px; margin: 0; }
+.time-bar .fill { width: 100%; transition: width 0.1s linear; }
+.time-bar .fill.low { background: linear-gradient(90deg, var(--bad), var(--warn)); }
+.flash-hud { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.flash-hud .stat { min-width: 0; }
+.flash-box { display: grid; place-items: center; background: var(--bg2); border: 2px solid var(--line); border-radius: var(--radius); padding: 6px; transition: border-color 0.15s, background 0.15s; }
+.flash-box.ok { border-color: var(--ok); }
+.flash-box.bad { border-color: var(--bad); animation: shake 0.3s; }
+.flash-staff { width: min(100%, 440px); height: auto; display: block; }
+.fs-line { stroke: var(--muted); stroke-width: 1.1; opacity: 0.75; }
+.fs-line.ledger { opacity: 1; stroke: var(--text); }
+.fs-clef { font-size: 44px; fill: var(--text); font-family: 'Noto Music', 'Bravura', 'Segoe UI Symbol', serif; }
+.fs-clef.bass { font-size: 34px; }
+.fs-acc { font-size: 17px; fill: var(--text); }
+.fs-head { fill: var(--text); }
+.flash-box.ok .fs-head { fill: var(--ok); }
+.flash-box.bad .fs-head { fill: var(--bad); }
+.choice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
+.choice-grid.wide { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+.choice { position: relative; padding: 12px 8px; font-size: 1.05rem; min-height: 48px; }
+.choice.black { background: var(--black-key); color: #fff; font-size: 0.85rem; }
+.choice .key-hint { position: absolute; top: 3px; right: 4px; font-size: 0.65rem; opacity: 0.6; }
+.flash-kb .piano, .flash-kb.piano { height: 110px; }
+
+/* ---------- rythme ---------- */
+.rhythm-card { display: grid; gap: 12px; }
+.rhythm-top { justify-content: space-between; }
+.rhythm-notation { background: var(--bg2); border-radius: var(--radius); padding: 6px 8px; border: 1px solid var(--line); }
+.rhythm-svg { width: 100%; height: auto; display: block; }
+.r-line { stroke: var(--muted); stroke-width: 1.2; }
+.r-bar { stroke: var(--text); stroke-width: 2; }
+.r-tick { stroke: var(--muted); opacity: 0.6; }
+.r-ts { font: 800 17px Georgia, serif; fill: var(--text); }
+.r-head { fill: var(--text); stroke: var(--text); stroke-width: 1.4; }
+.r-head.hollow { fill: var(--bg2); }
+.r-stem, .r-flag, .r-reststroke { stroke: var(--text); stroke-width: 1.6; fill: none; }
+.r-beam { stroke: var(--text); stroke-width: 4.5; }
+.r-dot, .r-restshape { fill: var(--text); }
+.r-tuplet { font: 700 12px var(--font); fill: var(--text); text-anchor: middle; }
+.r-count { font: 700 13px var(--font); fill: var(--accent); text-anchor: middle; }
+.r-count.rest { fill: var(--muted); font-weight: 400; }
+.r-ev.now .r-head { fill: var(--warn); stroke: var(--warn); }
+.r-ev.now .r-count { fill: var(--warn); }
+.rhythm-choices .choice { padding: 6px 10px; background: var(--bg2); }
+.rhythm-choices { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.rhythm-svg.compact .r-count { display: none; }
+.count-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; text-align: center; font-weight: 700; color: var(--muted); }
+.count-grid span { padding: 4px 0; border-radius: 8px; background: var(--card2); transition: background 0.08s, color 0.08s; }
+.count-grid span:nth-child(odd) { color: var(--text); }
+.count-grid span.now { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+.count-grid span.count { background: color-mix(in srgb, var(--warn) 40%, var(--card2)); }
+.tap-pad {
+  display: grid; place-items: center; gap: 2px; width: 100%; min-height: 96px; border-radius: 20px; font: inherit; font-size: 2rem; cursor: pointer;
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--accent) 35%, var(--card2)), var(--card2)); border: 2px dashed color-mix(in srgb, var(--accent) 50%, var(--line)); color: var(--text);
+  touch-action: manipulation; user-select: none;
+}
+.tap-pad span { font-size: 0.95rem; font-weight: 700; }
+.tap-pad.hit { animation: tapHit 0.18s ease-out; }
+@keyframes tapHit { from { transform: scale(0.96); background: color-mix(in srgb, var(--accent) 60%, var(--card2)); } to { transform: none; } }
+.tap-timeline { width: 100%; height: auto; display: block; background: var(--bg2); border-radius: 12px; }
+.tl-axis { stroke: var(--line); stroke-width: 2; }
+.tl-beat { stroke: var(--muted); opacity: 0.35; stroke-dasharray: 3 3; }
+.tl-lbl { font-size: 12px; fill: var(--muted); }
+.tl-exp { stroke-width: 3; stroke: var(--text); }
+.tl-exp.good, .tl-tap.good, .tl-link.good { stroke: var(--ok); }
+.tl-exp.ok, .tl-tap.ok, .tl-link.ok { stroke: var(--warn); }
+.tl-exp.miss, .tl-link.miss { stroke: var(--bad); }
+.tl-tap { stroke-width: 2; }
+.tl-tap.good { fill: var(--ok); }
+.tl-tap.ok { fill: var(--warn); }
+.tl-tap.miss { fill: var(--bad); stroke: var(--bad); }
+.tl-link { stroke-width: 1.4; stroke-dasharray: 2 2; }
+.tl-ms { font-size: 10px; fill: var(--muted); text-anchor: middle; }
+.tl-extra { font-size: 18px; font-weight: 800; fill: var(--bad); text-anchor: middle; }
+.good-chip { border-color: var(--ok); color: var(--ok); }
+.ok-chip { border-color: var(--warn); color: var(--warn); }
+.miss-chip { border-color: var(--bad); color: var(--bad); }
+
+/* ---------- oreille ---------- */
+.ear-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0 8px; scrollbar-width: thin; }
+.ear-tab { white-space: nowrap; padding: 8px 14px; border-radius: 999px; background: var(--card2); border: 1px solid var(--line); color: var(--text); text-decoration: none; font-weight: 600; font-size: 0.92rem; }
+.ear-tab.on { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; border-color: transparent; }
+.ear-card { display: grid; gap: 12px; }
+.ear-card h2 { margin: 0; }
+.ear-top .grow { flex: 1; min-width: 120px; margin: 0; }
+.listen-btn { min-width: 210px; }
+.dictation-staff { background: var(--bg2); border-radius: var(--radius); overflow: hidden; padding: 0; }
+.dict-dots { display: flex; gap: 6px; justify-content: center; }
+.dict-dots span { width: 12px; height: 12px; border-radius: 50%; background: var(--card2); border: 1px solid var(--line); }
+.dict-dots span.done { background: var(--ok); border-color: var(--ok); }
+
+@media (max-width: 560px) {
+  .flash-hud { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  .flash-hud .stat { padding: 4px 2px; }
+  .flash-hud .stat b { font-size: 1.05rem; }
+  .choice-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .choice-grid.wide { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rhythm-choices { grid-template-columns: 1fr; }
+  .lvl-btn { flex: 1 1 140px; }
+  .listen-btn { min-width: 0; flex: 1; }
+  .games-teaser { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .game-card, .game-icon, .teaser-icons span, .tap-pad.hit, .unlock { animation: none !important; }
+}

@@ -8,6 +8,9 @@
 // doigtés !1!..!5!), notes d'ornement {..} ignorées, barres et reprises (lues linéairement, sans
 // répétition), voix multiples (V:1 → main droite, V:2 → main gauche, suivantes selon la hauteur
 // moyenne), superposition de voix & (approximative), M:C et M:C|. Seul le premier morceau (X:) est lu.
+// Notation conservée : symboles d'accords "Am7" → song.chords, nuances !p! !mf! !ff!… et soufflets
+// !<(! !<)! !crescendo(! !diminuendo)! → song.dynamics, Q: multiples → song.tempoMap, mode mineur
+// → song.keyMode, liaisons de phrasé ( ) → note.slur, articulations . !staccato! !accent! !tenuto!.
 
 const r6 = (x) => Math.round(x * 1e6) / 1e6;
 const LETTER_PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -18,6 +21,8 @@ const MAJOR_FIFTHS = {
 };
 const MODES = { maj: 0, ion: 0, min: -3, m: -3, aeo: -3, dor: -2, phr: -4, lyd: 1, mix: -1, loc: -5 };
 const SHARP_ORDER = ['F', 'C', 'G', 'D', 'A', 'E', 'B'];
+const DYNAMICS = new Set(['pppp', 'ppp', 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff', 'ffff', 'sfz', 'sf', 'fp', 'rfz']);
+const ARTIC = { staccato: 'staccato', '.': 'staccato', accent: 'accent', '>': 'accent', emphasis: 'accent', tenuto: 'tenuto', wedge: 'staccatissimo', marcato: 'marcato', '^': 'marcato' };
 
 function abcError(msg, line) {
   return new Error(`Partition ABC invalide${line ? ` (ligne ${line})` : ''} : ${msg}`);
@@ -68,6 +73,8 @@ function parseKey(s) {
     else if (!/^(exp|bass|treble|alto|tenor)/.test(modeStr)) mode = 0;
   }
   let f = (MAJOR_FIFTHS[tonic] ?? 0) + mode;
+  if (mode === -3) res.mode = 'minor';
+  else if (mode === 0) res.mode = 'major';
   res.fifths = Math.max(-7, Math.min(7, f));
   applyFifths(res);
   const explicit = /\bexp\b/i.test(v);
@@ -125,6 +132,10 @@ export function parseABC(text) {
   let tempoStr = null;
   let tuneStarted = false;
 
+  const chordMarks = [];
+  const dynMarks = [];
+  const tempoMarks = [];
+  const openWedges = [];
   const voices = new Map(); // id -> voix
   const voiceOrder = [];
   const getVoice = (id, decl = '') => {
@@ -178,16 +189,22 @@ export function parseABC(text) {
       }
       case 'Q':
         if (!inBody) tempoStr = val;
-        else if (song.tempo === undefined) {
+        else {
           const t = parseTempo(val, unitL ?? defaultL());
-          if (t > 0) song.tempo = r6(t);
+          if (t > 0) {
+            if (song.tempo === undefined) song.tempo = r6(t);
+            tempoMarks.push({ beat: r6(curVoice().time), bpm: r6(t) });
+          }
         }
         break;
       case 'K': {
         const k = parseKey(val);
         if (k.hasTonic) {
           key = k;
-          if (song.keyFifths === undefined) song.keyFifths = k.fifths;
+          if (song.keyFifths === undefined) {
+            song.keyFifths = k.fifths;
+            if (k.mode) song.keyMode = k.mode;
+          }
         }
         if (!inBody) {
           inBody = true;
@@ -215,6 +232,22 @@ export function parseABC(text) {
     let i = 0;
     const n = line.length;
     let pendingFinger = null;
+    let pendingArts = [];
+    let pendingSlur = 0;
+    const decoration = (deco) => {
+      const v = curVoice();
+      const at = r6(v.time);
+      if (/^[1-5]$/.test(deco)) {
+        if (pendingFinger == null) pendingFinger = parseInt(deco, 10);
+      } else if (DYNAMICS.has(deco)) dynMarks.push({ beat: at, mark: deco });
+      else if (/^(<\(|crescendo\(|>\(|diminuendo\()$/.test(deco)) {
+        const item = { beat: at, mark: deco[0] === '<' || deco[0] === 'c' ? 'cresc' : 'dim', end: at + 1 };
+        openWedges.push(item);
+        dynMarks.push(item);
+      } else if (/^(<\)|crescendo\)|>\)|diminuendo\))$/.test(deco)) {
+        if (openWedges.length) openWedges.shift().end = at;
+      } else if (ARTIC[deco] && !pendingArts.includes(ARTIC[deco])) pendingArts.push(ARTIC[deco]);
+    };
 
     const readLength = () => {
       // (\d*)(/+)(\d*)
@@ -302,12 +335,19 @@ export function parseABC(text) {
           note = prev;
         } else {
           note = { midi: sp.midi, start, dur, finger: idx === 0 && pendingFinger ? pendingFinger : null };
+          if (pendingArts.length) note.articulations = [...pendingArts];
+          if (pendingSlur > 0 && idx === 0) note.slur = 'start';
           v.notes.push(note);
         }
         touched.push({ note, part: dur });
         if (sp.tie) newTies.set(sp.midi, note);
       });
       pendingFinger = null;
+      if (touched.length) {
+        pendingArts = [];
+        pendingSlur = 0;
+        v.lastNote = touched[0].note;
+      }
       v.ties = newTies;
       v.time = start + advance;
       v.lastEvent = { start, advance, touched };
@@ -341,13 +381,25 @@ export function parseABC(text) {
       if (++guard > n * 4 + 100) throw abcError('analyse bloquée', lineNo);
       const c = line[i];
       if (c === '%') break;
-      if (c === ' ' || c === '\t' || c === '`' || c === '\\' || c === 'y' || c === ')' ) {
+      if (c === ')') {
+        i++;
+        const ln = curVoice().lastNote;
+        if (ln) ln.slur = ln.slur === 'start' ? 'both' : 'stop';
+        continue;
+      }
+      if (c === ' ' || c === '\t' || c === '`' || c === '\\' || c === 'y') {
         i++;
         continue;
       }
       if (c === '"') {
         const e = line.indexOf('"', i + 1);
+        const body = line.slice(i + 1, e < 0 ? n : e).trim();
         i = e < 0 ? n : e + 1;
+        // symbole d'accord (les annotations commencent par ^ _ < > @)
+        if (body && !/^[\^_<>@]/.test(body) && /^[A-G]/.test(body)) {
+          const sym = body.replace(/^([A-G])#/, '$1♯').replace(/^([A-G])b/, '$1♭').replace(/\/([A-G])#/, '/$1♯').replace(/\/([A-G])b/, '/$1♭');
+          chordMarks.push({ beat: r6(curVoice().time), symbol: sym });
+        }
         continue;
       }
       if (c === '!' || c === '+') {
@@ -358,6 +410,7 @@ export function parseABC(text) {
         }
         const deco = line.slice(i + 1, e).trim();
         if (/^[1-5]$/.test(deco)) pendingFinger = parseInt(deco, 10);
+        else decoration(deco);
         i = e + 1;
         continue;
       }
@@ -366,7 +419,12 @@ export function parseABC(text) {
         i = e < 0 ? n : e + 1;
         continue;
       }
-      if ('.~HLMOPSTuv'.includes(c)) {
+      if (c === '.') {
+        i++;
+        if (!pendingArts.includes('staccato')) pendingArts.push('staccato');
+        continue;
+      }
+      if ('~HLMOPSTuv'.includes(c)) {
         i++;
         continue;
       }
@@ -390,7 +448,10 @@ export function parseABC(text) {
           const q = m[2] ? parseInt(m[2], 10) : defQ;
           const r = m[3] ? parseInt(m[3], 10) : p;
           if (p > 0 && q > 0 && r > 0) curVoice().tuplet = { p, q, r };
-        } else i++; // liaison d'expression
+        } else {
+          i++; // liaison d'expression
+          pendingSlur++;
+        }
         continue;
       }
       if (c === '|' || c === ':' || (c === '[' && /[|\d]/.test(line[i + 1] || '') )) {
@@ -530,10 +591,28 @@ export function parseABC(text) {
       hand = avg >= 60 ? 'R' : 'L';
     }
     for (const nn of v.notes) {
-      song.notes.push({ midi: nn.midi, start: r6(nn.start), dur: r6(nn.dur), hand, finger: nn.finger || null });
+      const out = { midi: nn.midi, start: r6(nn.start), dur: r6(nn.dur), hand, finger: nn.finger || null };
+      if (nn.slur) out.slur = nn.slur;
+      if (nn.articulations) out.articulations = nn.articulations;
+      song.notes.push(out);
     }
   });
   song.notes = song.notes.filter((x) => x.dur > 0).sort((a, b) => a.start - b.start || a.midi - b.midi);
   if (song.keyFifths === undefined) delete song.keyFifths;
+  const byBeat = (a, b) => a.beat - b.beat;
+  if (chordMarks.length) {
+    const seen = new Set();
+    song.chords = chordMarks.sort(byBeat).filter((c) => !seen.has(`${c.beat}|${c.symbol}`) && seen.add(`${c.beat}|${c.symbol}`));
+  }
+  if (dynMarks.length) song.dynamics = dynMarks.sort(byBeat);
+  if (tempoMarks.length && song.tempo) {
+    const tm = [{ beat: 0, bpm: song.tempo }];
+    for (const t of tempoMarks.sort(byBeat)) {
+      const last = tm[tm.length - 1];
+      if (Math.abs(last.beat - t.beat) < 1e-6) last.bpm = t.bpm;
+      else if (last.bpm !== t.bpm) tm.push(t);
+    }
+    if (tm.length > 1) song.tempoMap = tm;
+  }
   return song;
 }

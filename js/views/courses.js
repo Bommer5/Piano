@@ -15,11 +15,13 @@ import * as synth from '../audio/synth.js';
 import { mic } from '../audio/mic.js';
 import { midiInput, computerKeyboard } from '../audio/midi-input.js';
 import { ctx, main, onCleanup, registerRoute, findSong, allSongs, genreOf, levelLabel, applyTheme, section, statCard, songCard, startTrainer, settingsSections, homeSections } from '../ui/context.js';
+import { gamesTeaser } from './games.js';
 
 // ---------- Cours ----------
 function viewCourses() {
   const done = store.lessonsDone();
   main.append(h('h1', {}, 'Cours'), h('p', { class: 'lead' }, 'Des leçons pas à pas pour chaque style, avec les touches, les doigtés et des exercices que l’app corrige en direct. Chaque morceau a aussi son propre cours progressif.'));
+  main.append(section('🎮 Jeux', gamesTeaser()));
   const grid = h('div', { class: 'grid courses' });
   for (const c of COURSES) {
     const g = genreOf(c.genre);

@@ -200,7 +200,8 @@
 /* ---------- Mobile : barre d'onglets en bas ---------- */
 @media (max-width: 760px) {
   body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
-  .topbar { gap: 8px; }
+  /* backdrop-filter crée un bloc conteneur : la barre d'onglets « fixed » serait piégée dans l'en-tête */
+  .topbar { gap: 8px; backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--bg); }
   .profile-slot { margin-left: auto; }
   .profile-btn .pname { max-width: 90px; }
   .nav {

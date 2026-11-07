@@ -1,0 +1,39 @@
+/* Audio & MIDI : section Réglages et page Calibration */
+.audio-settings .au-h { margin: 10px 0 0; font-size: 0.95rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.audio-settings .setting > label small, .audio-settings .au-help { display: block; color: var(--muted); font-size: 0.8rem; font-weight: normal; }
+.audio-settings .au-block { grid-template-columns: 1fr; }
+.audio-settings .au-block p { margin: 0; }
+.au-devices { display: flex; flex-wrap: wrap; gap: 8px; }
+.au-device { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--card2); cursor: pointer; max-width: 100%; }
+.au-device span { overflow-wrap: anywhere; }
+.au-device small { color: var(--muted); }
+.au-sub { display: grid; gap: 10px; padding-left: 14px; border-left: 3px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+.au-sub[hidden] { display: none; }
+.au-sub > .btn { justify-self: start; }
+.au-meters { display: grid; gap: 6px; }
+.au-meter { min-width: 0; }
+.au-conf .bar { background: var(--accent2); }
+.au-live-end { display: flex; align-items: center; gap: 8px; }
+.au-note { min-width: 3.5em; text-align: center; font-weight: 700; }
+.au-links { grid-template-columns: 1fr auto auto; }
+
+.cal-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cal-head h1 { margin: 0; }
+.cal-stage { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 14px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 12px; }
+.cal-pulse { width: 46px; height: 46px; border-radius: 50%; background: var(--card2); border: 2px solid var(--accent); flex: none; }
+.cal-pulse.beat { animation: cal-beat 0.25s ease-out; }
+@keyframes cal-beat { from { background: var(--accent); transform: scale(1.15); } to { background: var(--card2); transform: scale(1); } }
+.cal-status { flex: 1; min-width: 160px; margin: 0; font-weight: 600; }
+.cal-tap { min-width: 120px; touch-action: manipulation; }
+.cal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.cal-card { display: grid; gap: 8px; align-content: start; padding: 14px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+.cal-card p { margin: 0; }
+.cal-card-head { display: flex; align-items: center; gap: 8px; }
+.cal-icon { font-size: 1.4rem; }
+.cal-wizard { min-height: 2.5em; margin: 8px 0; }
+.cal-section .level { margin: 8px 0; max-width: 420px; }
+@media (prefers-reduced-motion: reduce) { .cal-pulse.beat { animation-duration: 0.01s; } }
+@media (max-width: 640px) {
+  .au-links { grid-template-columns: 1fr; }
+  .au-live-end { justify-content: space-between; }
+}
