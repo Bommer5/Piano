@@ -81,3 +81,4 @@
   .chord-kb { height: 110px; }
 }
 .staff .ledger, .staff .staff-line { pointer-events: none; }
+.formats-wrap { overflow-x: auto; max-width: 100%; }

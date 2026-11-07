@@ -30,3 +30,4 @@
 .staff .note.clickable:focus { outline: none; }
 .staff .note.clickable:focus-visible .hit-area { stroke: var(--accent); stroke-width: 1.5; }
 .staff .note.current .accidental, .staff .note.hit .accidental, .staff .note.miss .accidental { stroke-width: inherit; }
+.staff-box > .staff { max-width: none; }

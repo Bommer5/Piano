@@ -33,9 +33,15 @@ function txt(parent, x, y, cls, s, extra = {}) {
   return t;
 }
 
-/** y d'une position diatonique sur la portée donnée (mise en page par défaut, conservé pour compatibilité). */
+// Bas des portées de la dernière portée rendue (la mise en page verticale dépend du morceau).
+let lastBottoms = { treble: TREBLE_BOTTOM, bass: BASS_BOTTOM };
+
+/**
+ * y d'une position diatonique sur la portée donnée, dans la mise en page de la dernière portée
+ * rendue (préférer staffView.yOf(), propre à chaque instance).
+ */
 export function staffY(diatonic, clef) {
-  return clef === 'bass' ? BASS_BOTTOM - (diatonic - 18) * HS : TREBLE_BOTTOM - (diatonic - 30) * HS;
+  return clef === 'bass' ? lastBottoms.bass - (diatonic - 18) * HS : lastBottoms.treble - (diatonic - 30) * HS;
 }
 
 // Lignes : clé de sol Mi4..Fa5 (diatoniques 30..38), clé de fa Sol2..La3 (18..26).
@@ -165,6 +171,8 @@ export class StaffView {
     const top = { treble: TT, bass: BT };
     const bottom = { treble: TB, bass: BB };
     const yOf = (d, clef) => (clef === 'bass' ? BB - (d - 18) * HS : TB - (d - 30) * HS);
+    this.yOf = yOf;
+    lastBottoms = { treble: TB, bass: BB };
     const midY = (clef) => (top[clef] + bottom[clef]) / 2;
 
     // ------------------------------------------------------------------
@@ -715,8 +723,8 @@ export class StaffView {
       }
     }
 
-    this.cursor = el('line', { x1: 0, x2: 0, y1: TT - 14, y2: BB + 14, class: 'cursor' }, this.svg);
-    this.setCursor(from);
+    // curseur hors champ tant que setCursor() n'est pas appelé (aperçus statiques)
+    this.cursor = el('line', { x1: -10, x2: -10, y1: TT - 14, y2: BB + 14, class: 'cursor' }, this.svg);
   }
 
   /** Le conteneur défile-t-il horizontalement (on peut alors élargir la portée) ? */

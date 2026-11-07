@@ -52,7 +52,7 @@ function viewImport() {
       }
     } }, f)))),
     section('Créer en jouant', recorderPanel()),
-    section('Formats acceptés', [formats, h('div', { class: 'block tip', html: '💡 <b>Partition papier ou PDF ?</b> La reconnaissance optique de partitions demande un logiciel spécialisé. Utilise gratuitement <b>MuseScore 4</b> (Fichier → Importer PDF) ou <b>Audiveris</b>, puis exporte en <b>MusicXML</b> et importe-le ici. Tu peux aussi trouver des milliers de partitions libres en MusicXML/MIDI sur <b>IMSLP</b>, <b>MuseScore.com</b> (domaine public) ou <b>Mutopia</b>.' })]),
+    section('Formats acceptés', [h('div', { class: 'table-wrap formats-wrap' }, formats), h('div', { class: 'block tip', html: '💡 <b>Partition papier ou PDF ?</b> La reconnaissance optique de partitions demande un logiciel spécialisé. Utilise gratuitement <b>MuseScore 4</b> (Fichier → Importer PDF) ou <b>Audiveris</b>, puis exporte en <b>MusicXML</b> et importe-le ici. Tu peux aussi trouver des milliers de partitions libres en MusicXML/MIDI sur <b>IMSLP</b>, <b>MuseScore.com</b> (domaine public) ou <b>Mutopia</b>.' })]),
   );
 
   async function handleFiles(files) {
