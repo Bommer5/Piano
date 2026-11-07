@@ -2,11 +2,17 @@
 // - morceau importé : enregistré à la place de l'original ;
 // - morceau intégré : si seuls les doigtés changent, ils sont mémorisés (store « fingerings.<id> »,
 //   appliqués par findSong) ; sinon on enregistre une copie « (modifié) » dans la bibliothèque.
-import { SongEditor } from '../ui/editor.js';
 import { fingeringOverrides, onlyFingeringsChanged, toRawSong } from '../core/edit.js';
 import { store } from '../core/storage.js';
 import { h, toast, modal, escapeHtml } from '../ui/dom.js';
-import { ctx, main, onCleanup, registerRoute, findSong } from '../ui/context.js';
+import { ctx, main, onCleanup, registerRoute, findSong, withDeps } from '../ui/context.js';
+
+// Modules propres à cette page : chargés à la première visite (allègent le démarrage).
+let SongEditor;
+async function loadDeps() {
+  const [m0] = await Promise.all([import('../ui/editor.js')]);
+  ({ SongEditor } = m0);
+}
 
 function viewEditor(id) {
   const s = findSong(id);
@@ -79,4 +85,4 @@ function findBaseNotes(id) {
   return base;
 }
 
-registerRoute(/^editer\/(.+)$/, viewEditor);
+registerRoute(/^editer\/(.+)$/, withDeps(loadDeps, viewEditor));

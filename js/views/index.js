@@ -34,8 +34,16 @@ const VIEWS = [
 /** Vues qui n'ont pas pu être chargées : [{ file, error }]. */
 export const failedViews = [];
 
+// Dépendances profondes des vues, préchargées en même temps que les vues : sans cela, chaque niveau
+// d'import coûte un aller-retour réseau de plus (≈ 0,5 s en 4G lente) avant le premier affichage.
+// (Liste vérifiée par tests/unit/perf-preload.test.mjs : chaque fichier doit exister.)
+export const DEEP_PRELOAD = [
+  '../data/lessons.js', '../core/coursegen.js', '../core/plan.js', '../ui/keyboard.js', '../audio/mic.js', '../core/pitch.js',
+  '../core/spectrum.js', '../core/reading.js', '../core/rhythmgame.js', '../core/eartraining.js', '../core/share.js', '../ui/shell.js',
+];
+
 if (typeof document !== 'undefined') {
-  for (const [file] of VIEWS) {
+  for (const file of [...VIEWS.map(([f]) => f), ...DEEP_PRELOAD]) {
     const l = document.createElement('link');
     l.rel = 'modulepreload';
     l.href = new URL(file, import.meta.url).href;

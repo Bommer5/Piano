@@ -1,21 +1,22 @@
 // Vue : import
-import { GENRES, SONGS, getSong } from '../data/songs.js';
-import { COURSES, getCourse, getLesson } from '../data/lessons.js';
-import { prepareSong, phrases, parseTrack } from '../core/song.js';
-import { generateSongCourse, describePosition } from '../core/coursegen.js';
-import { noteLabel, midiToName, nameToMidi, centsOff, midiToFreq } from '../core/notes.js';
-import { estimateNotes } from '../core/spectrum.js';
-import { PitchSmoother } from '../core/onset.js';
-import { store, DEFAULT_SETTINGS, localDate } from '../core/storage.js';
-import { importScoreFile, importScoreText, SUPPORTED_FORMATS, exportSong } from '../parsers/index.js';
-import { keyDiagram, PianoKeyboard } from '../ui/keyboard.js';
-import { StaffView } from '../ui/staff.js';
-import { h, toast, modal, download, escapeHtml, stars } from '../ui/dom.js';
+import { GENRES } from '../data/songs.js';
+import { prepareSong } from '../core/song.js';
+import { noteLabel } from '../core/notes.js';
+import { store } from '../core/storage.js';
+import { PianoKeyboard } from '../ui/keyboard.js';
+import { h, toast } from '../ui/dom.js';
 import * as synth from '../audio/synth.js';
-import { mic } from '../audio/mic.js';
 import { midiInput, computerKeyboard } from '../audio/midi-input.js';
 import { quantize, dedupe, suggestSplitPoint, splitHands, GRIDS, toRawSong } from '../core/edit.js';
-import { ctx, main, onCleanup, registerRoute, findSong, allSongs, genreOf, levelLabel, applyTheme, section, statCard, songCard, startTrainer, settingsSections, homeSections } from '../ui/context.js';
+import { ctx, main, onCleanup, registerRoute, levelLabel, section, withDeps } from '../ui/context.js';
+
+// Modules propres à cette page : chargés à la première visite (allègent le démarrage).
+let importScoreFile, importScoreText, SUPPORTED_FORMATS, StaffView;
+async function loadDeps() {
+  const [m0, m1] = await Promise.all([import('../parsers/index.js'), import('../ui/staff.js')]);
+  ({ importScoreFile, importScoreText, SUPPORTED_FORMATS } = m0);
+  ({ StaffView } = m1);
+}
 
 // ---------- Import ----------
 function viewImport() {
@@ -268,4 +269,4 @@ export function recordingToSong(r, { grid = 0.25, swing = 'auto', splitPoint = n
   return out;
 }
 
-registerRoute(/^importer$/, viewImport)
+registerRoute(/^importer$/, withDeps(loadDeps, viewImport))

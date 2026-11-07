@@ -3,9 +3,15 @@
 import { store, localDate, addDays } from '../core/storage.js';
 import { weakMeasures, weakNotes } from '../core/plan.js';
 import { noteLabel } from '../core/notes.js';
-import { StaffView } from '../ui/staff.js';
 import { h, toast, stars } from '../ui/dom.js';
-import { ctx, main, registerRoute, findSong, allSongs, section } from '../ui/context.js';
+import { ctx, main, registerRoute, findSong, allSongs, section, withDeps } from '../ui/context.js';
+
+// Modules propres à cette page : chargés à la première visite (allègent le démarrage).
+let StaffView;
+async function loadDeps() {
+  const [m0] = await Promise.all([import('../ui/staff.js')]);
+  ({ StaffView } = m0);
+}
 
 const SESSIONS = 10;
 
@@ -190,4 +196,4 @@ function viewTeacher() {
   );
 }
 
-registerRoute(/^carnet$/, viewTeacher);
+registerRoute(/^carnet$/, withDeps(loadDeps, viewTeacher));

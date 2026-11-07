@@ -239,10 +239,10 @@ export const SONGS = [
     timeSig: [4, 4],
     keyFifths: 0,
     description:
-      'Le thème de la 9e symphonie, presque entièrement en position de Do. Attention à la noire pointée suivie d’une croche à la fin de chaque phrase : comptez « 1-et-2 ».',
+      'Le thème de la 9e symphonie, presque entièrement en position de Do. Attention à la noire pointée suivie d’une croche à la fin de chaque phrase : comptez « 1 – 2 – et », la croche tombe sur le « et ».',
     tags: ['Beethoven', 'position de Do', 'mains ensemble'],
     tracks: {
-      R: 'E4:1:3 E4:1:3 F4:1:4 G4:1:5 | G4:1:5 F4:1:4 E4:1:3 D4:1:2 | C4:1:1 C4:1:1 D4:1:2 E4:1:3 | E4:1.5:3 D4:0.5:2 D4:2:2 | E4:1:3 E4:1:3 F4:1:4 G4:1:5 | G4:1:5 F4:1:4 E4:1:3 D4:1:2 | C4:1:1 C4:1:1 D4:1:2 E4:1:3 | D4:1.5:2 C4:0.5:1 C4:2:1 | D4:1:2 D4:1:2 E4:1:3 C4:1:1 | D4:1:2 E4:0.5:3 F4:0.5:4 E4:1:3 C4:1:1 | D4:1:2 E4:0.5:3 F4:0.5:4 E4:1:3 D4:1:2 | C4:1:2 D4:1:3 G3:2:1 | E4:1:3 E4:1:3 F4:1:4 G4:1:5 | G4:1:5 F4:1:4 E4:1:3 D4:1:2 | C4:1:1 C4:1:1 D4:1:2 E4:1:3 | D4:1.5:2 C4:0.5:1 C4:2:1',
+      R: 'E4:1:3 E4:1:3 F4:1:4 G4:1:5 | G4:1:5 F4:1:4 E4:1:3 D4:1:2 | C4:1:1 C4:1:1 D4:1:2 E4:1:3 | E4:1.5:3 D4:0.5:2 D4:2:2 | E4:1:3 E4:1:3 F4:1:4 G4:1:5 | G4:1:5 F4:1:4 E4:1:3 D4:1:2 | C4:1:1 C4:1:1 D4:1:2 E4:1:3 | D4:1.5:2 C4:0.5:1 C4:2:1 | D4:1:2 D4:1:2 E4:1:3 C4:1:1 | D4:1:2 E4:0.5:3 F4:0.5:4 E4:1:3 C4:1:1 | D4:1:2 E4:0.5:3 F4:0.5:4 E4:1:3 D4:1:2 | C4:1:1 D4:1:2 G3:2:1 | E4:1:3 E4:1:3 F4:1:4 G4:1:5 | G4:1:5 F4:1:4 E4:1:3 D4:1:2 | C4:1:1 C4:1:1 D4:1:2 E4:1:3 | D4:1.5:2 C4:0.5:1 C4:2:1',
       L: 'C3:4:5 | G3:4:1 | C3:4:5 | G3:4:1 | C3:4:5 | G3:4:1 | C3:4:5 | G3:2:1 C3:2:5 | G3:4:1 | G3:2:1 C3:2:5 | G3:4:1 | C3:2:5 D3:2:4 | C3:4:5 | G3:4:1 | C3:4:5 | G3:2:1 C3:2:5',
     },
   },
@@ -272,6 +272,8 @@ export const SONGS = [
     tempo: 60,
     timeSig: [3, 8],
     keyFifths: 0,
+    keyMode: 'minor',
+    pickupBeats: 0.5,
     description:
       'La partie A de la célèbre bagatelle. Les doubles croches passent d’une main à l’autre : travaillez lentement le relais entre la main gauche (arpège) et la main droite, avec la pédale à chaque mesure.',
     tags: ['Beethoven', 'romantique', 'pédale', '3/8'],
@@ -325,6 +327,7 @@ export const SONGS = [
     tempo: 80,
     timeSig: [3, 4],
     keyFifths: 0,
+    pickupBeats: 1,
     description:
       'La « Wiegenlied » op. 49 n°4, transposée en Do. La main gauche berce (basse puis deux accords) : gardez-la très douce pour laisser chanter la mélodie.',
     tags: ['Brahms', 'romantique', 'valse', '3/4'],
@@ -417,6 +420,7 @@ export const SONGS = [
     tempo: 90,
     timeSig: [3, 4],
     keyFifths: 0,
+    pickupBeats: 1,
     description:
       'Le morceau à savoir jouer pour toutes les fêtes ! Il commence par une levée (deux notes avant la première mesure) au rythme pointé « taaa-ta ».',
     tags: ['anacrouse', 'rythme pointé', '3/4'],
@@ -457,8 +461,8 @@ export const SONGS = [
       'La première phrase descend toute la gamme de Do : c’est l’occasion idéale de travailler le croisement du 3e doigt par-dessus le pouce (Fa-Mi).',
     tags: ['Noël', 'gamme descendante', 'passage du pouce'],
     tracks: {
-      R: 'C5:2:5 B4:1.5:4 A4:0.5:3 | G4:1.5:2 F4:0.5:1 E4:1:3 D4:1:2 | C4:3:1 G4:1:1 | A4:3:2 A4:1:2 | B4:3:3 B4:1:3 | C5:4:4',
-      L: 'C3:4:5 | F3:2:2 G3:2:1 | C3:4:5 | F3:4:2 | G3:4:1 | C3:4:5',
+      R: 'C5:2:5 B4:1.5:4 A4:0.5:3 | G4:3:2 F4:1:1 | E4:2:3 D4:2:2 | C4:3:1 G4:1:1 | A4:3:2 A4:1:2 | B4:3:3 B4:1:3 | C5:4:4',
+      L: 'C3:4:5 | E3:2:3 F3:2:2 | G3:4:1 | C3:4:5 | F3:4:2 | G3:4:1 | C3:4:5',
     },
   },
   {
@@ -474,7 +478,7 @@ export const SONGS = [
       'Un chant en 6/8 qui se balance en deux grands temps. Tenez bien les notes longues de la main gauche et chantez intérieurement les paroles pour trouver le phrasé.',
     tags: ['Noël', '6/8', 'legato'],
     tracks: {
-      R: 'G4:0.75 A4:0.25 G4:0.5 E4:1.5 | G4:0.75 A4:0.25 G4:0.5 E4:1.5 | D5:1 D5:0.5 B4:1.5 | C5:1 C5:0.5 G4:1.5 | A4:1 A4:0.5 C5:0.75 B4:0.25 A4:0.5 | G4:0.75 A4:0.25 G4:0.5 E4:1.5 | A4:1 A4:0.5 C5:0.75 B4:0.25 A4:0.5 | G4:0.75 A4:0.25 G4:0.5 E4:1.5 | D5:1 D5:0.5 F5:0.75 D5:0.25 B4:0.5 | C5:1.5 E5:1.5 | C5:0.75 G4:0.25 E4:0.5 G4:0.75 F4:0.25 D4:0.5 | C4:3',
+      R: 'G4:0.75 A4:0.25 G4:0.5 E4:1.5 | G4:0.75 A4:0.25 G4:0.5 E4:1.5 | D5:1 D5:0.5 B4:1.5 | C5:1 C5:0.5 G4:1.5 | A4:1 A4:0.5 C5:0.75 B4:0.25 A4:0.5 | G4:0.75 A4:0.25 G4:0.5 E4:1.5 | A4:1 A4:0.5 C5:0.75 B4:0.25 A4:0.5 | G4:0.75 A4:0.25 G4:0.5 E4:1.5 | D5:1 D5:0.5 F5:0.75 D5:0.25 B4:0.5 | C5:1.5 E5:1.5 | C5:0.5 G4:0.5 E4:0.5 G4:0.75 F4:0.25 D4:0.5 | C4:3',
       L: 'C3+G3:3:5+1 | C3+G3:3:5+1 | G2+D3:3:5+1 | C3+G3:3:5+1 | F2+C3:3:5+1 | C3+G3:3:5+1 | F2+C3:3:5+1 | C3+G3:3:5+1 | G2+D3:3:5+1 | C3+G3:3:5+1 | C3+G3:1.5:5+1 G2+D3:1.5:5+1 | C3+G3:3:5+1',
     },
   },
@@ -510,6 +514,8 @@ export const SONGS = [
     tempo: 60,
     timeSig: [6, 8],
     keyFifths: 0,
+    keyMode: 'minor',
+    pickupBeats: 0.5,
     description:
       'Une ballade anglaise de la Renaissance en La mineur, en 6/8. Remarquez le Sol naturel (couleur ancienne) puis le Sol dièse aux cadences : ce contraste fait tout le charme de la mélodie.',
     tags: ['Renaissance', 'mineur', '6/8', 'anacrouse'],
@@ -530,11 +536,12 @@ export const SONGS = [
     tempo: 80,
     timeSig: [4, 4],
     keyFifths: -1,
+    pickupBeats: 1,
     description:
-      'Le chant des adieux, en Fa majeur (attention au Si bémol à la main gauche). Le rythme pointé « taaa-ta » revient sans cesse : comptez « 1-et-2 » pour placer la double croche.',
+      'Le chant des adieux, en Fa majeur (attention au Si bémol à la main gauche). Le rythme pointé « taaa-ta » (noire pointée + croche) revient sans cesse : comptez « 1 – 2 – et » pour placer la croche.',
     tags: ['écossais', 'rythme pointé', 'anacrouse', 'Fa majeur'],
     tracks: {
-      R: 'r:3 C4:1:1 | F4:1.5:2 F4:0.5:2 F4:1:2 A4:1:4 | G4:1.5:3 F4:0.5:2 G4:1:3 A4:1:4 | F4:1.5:1 F4:0.5:1 A4:1:2 C5:1:4 | D5:3:5 D5:1:5 | C5:1.5:4 A4:0.5:2 A4:1:2 F4:1:1 | G4:1.5:2 F4:0.5:1 G4:1:2 A4:1:3 | F4:1.5:3 D4:0.5:2 D4:1:2 C4:1:1 | F4:4:4',
+      R: 'r:3 C4:1:1 | F4:1.5:2 F4:0.5:2 F4:1:2 A4:1:4 | G4:1.5:3 F4:0.5:2 G4:1:3 A4:1:4 | F4:1.5:1 F4:0.5:1 A4:1:2 C5:1:4 | D5:3:5 D5:1:5 | C5:1.5:4 A4:0.5:2 A4:1:2 F4:1:1 | G4:1.5:2 F4:0.5:1 G4:1:2 A4:1:3 | F4:1.5:4 D4:0.5:2 D4:1:2 C4:1:1 | F4:4:4',
       L: 'r:4 | F2+C3:4:5+1 | C3+G3:4:5+1 | F2+C3:4:5+1 | Bb2+F3:4:5+1 | F2+C3:4:5+1 | C3+G3:4:5+1 | Bb2+F3:2:5+1 C3+G3:2:5+1 | F2+C3:4:5+1',
     },
   },
@@ -547,6 +554,7 @@ export const SONGS = [
     tempo: 100,
     timeSig: [4, 4],
     keyFifths: 0,
+    pickupBeats: 1,
     description:
       'Une chanson folk américaine pleine d’entrain. La main droite utilise Do-Ré-Mi puis Sol-La avec les doigts 4 et 5 : pas besoin du Fa !',
     tags: ['américain', 'anacrouse', 'croches'],
@@ -566,6 +574,7 @@ export const SONGS = [
     tempo: 76,
     timeSig: [3, 4],
     keyFifths: 1,
+    pickupBeats: 1,
     description:
       'L’hymne le plus célèbre du répertoire gospel. Main gauche : basse sur le premier temps puis accord tenu. Laissez respirer la mélodie à la fin de chaque phrase.',
     tags: ['hymne', '3/4', 'Sol majeur', 'accords de 7e'],
@@ -573,7 +582,7 @@ export const SONGS = [
       R: 'r:2 D4:1 | G4:2 B4:0.5 G4:0.5 | B4:2 A4:1 | G4:2 E4:1 | D4:2 D4:1 | G4:2 B4:0.5 G4:0.5 | B4:2 A4:0.5 B4:0.5 | D5:3 | r:2 B4:1 | D5:2 B4:0.5 G4:0.5 | B4:2 A4:1 | G4:2 E4:1 | D4:2 D4:1 | G4:2 B4:0.5 G4:0.5 | B4:2 A4:1 | G4:3',
       L: (() => {
         const G = 'G2:1 B2+D3:2', G7 = 'G2:1 B2+F3:2', C = 'C3:1 E3+G3:2', D = 'D3:1 F#3+A3:2', D7 = 'D3:1 F#3+C4:2', Em = 'E2:1 G2+B2:2';
-        return ['r:3', G, G7, C, G, G, G, D, D7, G, G7, C, G, Em, D7, 'G2+D3+G3:3'].join(' | ');
+        return ['r:3', G, G7, C, G, G, G, D, G, G, G7, C, G, Em, D7, 'G2+D3+G3:3'].join(' | ');
       })(),
     },
   },
@@ -758,6 +767,7 @@ export const SONGS = [
     tempo: 76,
     timeSig: [2, 4],
     keyFifths: 0,
+    pickupBeats: 0.5,
     description:
       'Le rag le plus célèbre de Joplin (1902). Mélodie syncopée à la main droite, stride « oum-pa » à la main gauche. Travaillez d’abord la main droite seule, très lentement, en comptant les doubles croches.',
     tags: ['Joplin', 'syncope', 'stride'],
@@ -815,6 +825,7 @@ export const SONGS = [
     tempo: 72,
     timeSig: [4, 4],
     keyFifths: 0,
+    keyMode: 'minor',
     description:
       'Ballade en La mineur sur la grille Lam – Fa – Do – Sol. La main gauche déroule des arpèges « fondamentale-quinte-octave » : jouez-les legato avec la pédale, et faites chanter la mélodie au-dessus.',
     tags: ['ballade', 'arpèges', 'pédale', 'mineur'],
@@ -836,6 +847,7 @@ export const SONGS = [
     tempo: 92,
     timeSig: [4, 4],
     keyFifths: 0,
+    keyMode: 'minor',
     description:
       'Le rythme d’accompagnement le plus utilisé en pop : trois croches + trois croches + deux croches (1 - - 4 - - 7 -). Comptez « 1 et 2 et 3 et 4 et » et accentuez les attaques.',
     tags: ['rythme', 'syncope', 'accompagnement', 'grille'],
@@ -933,6 +945,7 @@ export const SONGS = [
     tempo: 60,
     timeSig: [4, 4],
     keyFifths: 0,
+    keyMode: 'minor',
     description:
       'La relative mineure de Do, avec le Sol dièse (sensible) qui crée l’intervalle « oriental » Fa–Sol♯. Doigté identique à Do majeur.',
     tags: ['gamme', 'mineur harmonique', 'La mineur'],
@@ -947,6 +960,7 @@ export const SONGS = [
     tempo: 60,
     timeSig: [4, 4],
     keyFifths: 1,
+    keyMode: 'minor',
     description:
       'Relative mineure de Sol : Fa♯ à l’armure et Ré♯ ajouté comme sensible. Même doigté que Do majeur aux deux mains.',
     tags: ['gamme', 'mineur harmonique', 'Mi mineur'],

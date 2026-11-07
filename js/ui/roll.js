@@ -1,4 +1,26 @@
 // Vue « notes qui tombent » (canvas), alignée sur le clavier.
+// Performance : la trame n'est redessinée que si quelque chose a changé (position, états, taille…),
+// le dégradé de la ligne de jeu et les géométries des touches sont mis en cache.
+
+/** Map qui compte ses modifications (permet de savoir si le dessin doit être refait). */
+class StateMap extends Map {
+  constructor() {
+    super();
+    this.version = 0;
+  }
+  set(k, v) {
+    if (super.get(k) !== v || !super.has(k)) this.version++;
+    return super.set(k, v);
+  }
+  delete(k) {
+    this.version++;
+    return super.delete(k);
+  }
+  clear() {
+    this.version++;
+    super.clear();
+  }
+}
 
 export class NoteRoll {
   constructor(canvas, keyboard) {
@@ -7,7 +29,7 @@ export class NoteRoll {
     this.keyboard = keyboard;
     this.beatsVisible = 6;
     this.notes = [];
-    this.state = new Map(); // id -> 'hit' | 'miss' | 'good'...
+    this.state = new StateMap(); // id -> 'hit' | 'miss' | 'good'...
     this.showFingers = true;
     this.labels = null;
     this.loop = null;
@@ -30,6 +52,23 @@ export class NoteRoll {
     this.w = r.width;
     this.h = r.height;
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this._key = null; // le canvas a été effacé
+    this._grad = null;
+  }
+
+  /** Géométrie (relative) d'une touche, mise en cache tant que la disposition du clavier ne change pas. */
+  geo(midi) {
+    const layout = this.keyboard.layout;
+    if (this._geoLayout !== layout) {
+      this._geoLayout = layout;
+      this._geo = new Map();
+    }
+    let g = this._geo.get(midi);
+    if (g === undefined) {
+      g = this.keyboard.geometry(midi);
+      this._geo.set(midi, g);
+    }
+    return g;
   }
 
   setNotes(notes) {
@@ -57,6 +96,16 @@ export class NoteRoll {
   draw(beat, info) {
     if (!this.w) this.resize();
     const { ctx, w, h } = this;
+    // rien n'a changé depuis la dernière trame : on garde le dessin
+    let cur = '';
+    if (info.current) for (const id of info.current) cur += id + ',';
+    const key = `${beat}|${w}|${h}|${this.state.version}|${cur}|${info.activeHands}|${info.beatsPerMeasure}|${this.beatsVisible}|${this.loop ? this.loop.from + '-' + this.loop.to : ''}|${this.overlay ? this.overlay.length : -1}|${this.showFingers}`;
+    if (key === this._key && this.notes === this._notes && this.overlay === this._overlay && this.labels === this._labels && this.noteColor === this._noteColor && this.keyboard.layout === this._geoLayout) return;
+    this._key = key;
+    this._notes = this.notes;
+    this._overlay = this.overlay;
+    this._labels = this.labels;
+    this._noteColor = this.noteColor;
     const c = (this._c ||= this.colors());
     ctx.clearRect(0, 0, w, h);
     const pxPerBeat = h / this.beatsVisible;
@@ -65,12 +114,12 @@ export class NoteRoll {
     // lignes de mesure
     const bpm = info.beatsPerMeasure;
     ctx.fillStyle = c.grid;
+    ctx.font = '10px system-ui';
     const firstBar = Math.floor(beat / bpm) * bpm;
     for (let b = firstBar; b < beat + this.beatsVisible + bpm; b += bpm) {
       const y = yOf(b);
       if (y < 0 || y > h) continue;
       ctx.fillRect(0, y, w, 1);
-      ctx.font = '10px system-ui';
       ctx.fillStyle = 'rgba(255,255,255,.35)';
       ctx.fillText(String(Math.round(b / bpm) + 1), 4, y - 3);
       ctx.fillStyle = c.grid;
@@ -82,9 +131,13 @@ export class NoteRoll {
       ctx.fillRect(0, Math.max(0, y1), w, Math.min(h, y0) - Math.max(0, y1));
     }
 
+    let font = '';
+    const setFont = (f) => {
+      if (f !== font) ctx.font = font = f;
+    };
     for (const n of this.notes) {
       if (n.start > beat + this.beatsVisible || n.start + n.dur < beat - 0.5) continue;
-      const g = this.keyboard.geometry(n.midi);
+      const g = this.geo(n.midi);
       if (!g) continue;
       const x = g.x * w + 1, ww = g.w * w - 2;
       const y1 = yOf(n.start + n.dur) + 1, y0 = yOf(n.start);
@@ -103,14 +156,14 @@ export class NoteRoll {
       }
       if (this.showFingers && n.finger && y0 - y1 > 14 && ww > 9) {
         ctx.fillStyle = 'rgba(0,0,0,.55)';
-        ctx.font = `bold ${Math.min(13, ww * 0.8)}px system-ui`;
+        setFont(`bold ${Math.min(13, ww * 0.8)}px system-ui`);
         ctx.textAlign = 'center';
         ctx.fillText(String(n.finger), x + ww / 2, y0 - 5);
         ctx.textAlign = 'start';
       }
       if (this.labels && y0 - y1 > 30 && ww > 16) {
         ctx.fillStyle = 'rgba(0,0,0,.45)';
-        ctx.font = `${Math.min(10, ww * 0.45)}px system-ui`;
+        setFont(`${Math.min(10, ww * 0.45)}px system-ui`);
         ctx.textAlign = 'center';
         ctx.fillText(this.labels(n.midi), x + ww / 2, y1 + 11);
         ctx.textAlign = 'start';
@@ -119,10 +172,13 @@ export class NoteRoll {
     ctx.globalAlpha = 1;
     if (this.overlay) this.drawOverlay(beat, yOf, c);
     // ligne de jeu
-    const grad = ctx.createLinearGradient(0, h - 10, 0, h);
-    grad.addColorStop(0, 'rgba(255,255,255,0)');
-    grad.addColorStop(1, 'rgba(255,255,255,.25)');
-    ctx.fillStyle = grad;
+    if (!this._grad || this._gradH !== h) {
+      this._grad = ctx.createLinearGradient(0, h - 10, 0, h);
+      this._grad.addColorStop(0, 'rgba(255,255,255,0)');
+      this._grad.addColorStop(1, 'rgba(255,255,255,.25)');
+      this._gradH = h;
+    }
+    ctx.fillStyle = this._grad;
     ctx.fillRect(0, h - 10, w, 10);
   }
 }
@@ -133,7 +189,7 @@ NoteRoll.prototype.drawOverlay = function (beat, yOf, c) {
   ctx.lineWidth = 2;
   for (const n of this.overlay) {
     if (n.start > beat + this.beatsVisible || n.start + n.dur < beat - 0.5) continue;
-    const g = this.keyboard.geometry(n.midi);
+    const g = this.geo(n.midi);
     if (!g) continue;
     const x = g.x * w + 3, ww = Math.max(3, g.w * w - 6);
     const y1 = yOf(n.start + n.dur) + 1, y0 = yOf(n.start);

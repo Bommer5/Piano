@@ -5,7 +5,6 @@ import { GENRES, SONGS, getSong } from '../data/songs.js';
 import { prepareSong } from '../core/song.js';
 import { applyFingeringOverrides } from '../core/edit.js';
 import { store } from '../core/storage.js';
-import { Trainer } from './trainer.js';
 import { h, stars } from './dom.js';
 import * as synth from '../audio/synth.js';
 
@@ -95,8 +94,59 @@ export function startTrainer(s, query = {}, { back, onNext, title, subtitle } = 
   ]));
   const root = h('div');
   main.append(root);
-  const t = new Trainer(root, s, opts, { onNext });
-  onCleanup(() => t.destroy());
-  return t;
+  // L'entraîneur (et ses dépendances : moteur, prise, rapport, export MIDI…) est chargé à la demande :
+  // il ne pèse pas sur le démarrage. Les appelants ne touchent qu'à `hooks`, partagé avec l'instance.
+  const hooks = { onNext };
+  const handle = { hooks, trainer: null, destroyed: false };
+  onCleanup(() => {
+    handle.destroyed = true;
+    handle.trainer?.destroy();
+  });
+  root.setAttribute('aria-busy', 'true');
+  handle.ready = loadTrainer().then(({ Trainer }) => {
+    root.removeAttribute('aria-busy');
+    if (handle.destroyed || !root.isConnected) return null;
+    handle.trainer = new Trainer(root, s, opts, hooks);
+    return handle.trainer;
+  }).catch((err) => {
+    console.error(err);
+    if (!handle.destroyed) root.append(h('div', { class: 'card error' }, [h('h2', {}, 'Oups…'), h('p', {}, 'L’entraîneur n’a pas pu être chargé (connexion interrompue ?). Recharge la page pour réessayer.')]));
+  });
+  return handle;
 }
 
+let trainerModule = null;
+/** Charge (une seule fois) le module de l'entraîneur. */
+export function loadTrainer() {
+  return (trainerModule ||= import('./trainer.js').catch((e) => { trainerModule = null; throw e; }));
+}
+
+
+/**
+ * Route dont la vue a besoin de modules chargés à la demande (`load()` → Promise).
+ * Au premier passage, la vue est affichée dès que les modules sont arrivés (sauf si on a quitté la page entre-temps).
+ */
+export function withDeps(load, view) {
+  let ready = false, pending = null;
+  return (...args) => {
+    if (ready) return view(...args);
+    let left = false;
+    onCleanup(() => (left = true));
+    main.setAttribute('aria-busy', 'true');
+    (pending ||= Promise.resolve(load()).then(() => (ready = true))).then(() => {
+      main.removeAttribute('aria-busy');
+      if (left) return;
+      try {
+        view(...args);
+      } catch (err) {
+        console.error(err);
+        main.append(h('div', { class: 'card error' }, [h('h2', {}, 'Oups…'), h('p', {}, err.message), h('a', { href: '#/', class: 'btn' }, "Retour à l'accueil")]));
+      }
+    }, (err) => {
+      pending = null;
+      main.removeAttribute('aria-busy');
+      console.error(err);
+      if (!left) main.append(h('div', { class: 'card error' }, [h('h2', {}, 'Page indisponible'), h('p', { class: 'muted' }, 'Une partie de l’application n’a pas pu être chargée (connexion interrompue ?). Recharge la page pour réessayer.'), h('button', { class: 'btn primary', onclick: () => location.reload() }, 'Recharger')]));
+    });
+  };
+}

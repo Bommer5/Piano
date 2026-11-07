@@ -185,7 +185,11 @@ export class MicListener {
     }
     // indice de confiance : clarté × marge au-dessus du seuil × stabilité de la hauteur
     if (midi != null && midi === this._stable.midi) this._stable.n++;
-    else this._stable = { midi, n: midi == null ? 0 : 1 };
+    else {
+      // objet réutilisé : pas d'allocation par trame
+      this._stable.midi = midi;
+      this._stable.n = midi == null ? 0 : 1;
+    }
     const snr = midi == null ? 0 : Math.min(1, r.rms / (th.minRms * 2));
     const stab = Math.min(1, this._stable.n / 3);
     const confidence = midi == null ? 0 : +(clarity * (0.4 + 0.6 * snr) * (0.5 + 0.5 * stab)).toFixed(3);

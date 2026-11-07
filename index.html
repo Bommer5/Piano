@@ -24,32 +24,44 @@
   <link rel="stylesheet" href="css/games.css">
 </head>
 <body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="pc-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5260ec"/><stop offset="1" stop-color="#8d43d6"/></linearGradient>
+      <symbol id="pc-logo" viewBox="0 0 48 48"><rect width="48" height="48" rx="13" fill="url(#pc-grad)"/><rect x="9" y="14" width="30" height="22" rx="3" fill="#fff"/><path d="M16.5 14v22M24 14v22M31.5 14v22" stroke="#5260ec" stroke-opacity=".35" stroke-width="1.2"/><rect x="14" y="14" width="5" height="12" rx="1.2" fill="#1a1c2c"/><rect x="21.5" y="14" width="5" height="12" rx="1.2" fill="#1a1c2c"/><rect x="29" y="14" width="5" height="12" rx="1.2" fill="#1a1c2c"/><path d="M35 6v9.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/><ellipse cx="32.6" cy="15.6" rx="2.9" ry="2.2" fill="#fff" transform="rotate(-20 32.6 15.6)"/></symbol>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9v11h13V9"/><path d="M10 20v-5.5h4V20"/></symbol>
+      <symbol id="i-songs" viewBox="0 0 24 24"><path d="M9 18V5.5l11-2V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/><path d="M9 9.5l11-2"/></symbol>
+      <symbol id="i-courses" viewBox="0 0 24 24"><path d="M2.5 9 12 4.5 21.5 9 12 13.5z"/><path d="M6.5 11v5c0 1.5 2.5 3 5.5 3s5.5-1.5 5.5-3v-5"/><path d="M21.5 9v5.5"/></symbol>
+      <symbol id="i-games" viewBox="0 0 24 24"><rect x="2.5" y="7" width="19" height="11" rx="5.5"/><path d="M7.5 10.5v4M5.5 12.5h4"/><circle cx="15.5" cy="11.5" r=".9" fill="currentColor"/><circle cx="18" cy="14" r=".9" fill="currentColor"/></symbol>
+      <symbol id="i-progress" viewBox="0 0 24 24"><path d="M3.5 20.5h17"/><path d="M5 16l5-5 3.5 3.5L20 8"/><path d="M15.5 8H20v4.5"/></symbol>
+      <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="18.5" cy="12" r="1.6" fill="currentColor"/></symbol>
+    </defs>
+  </svg>
   <a class="skip" href="#main">Aller au contenu</a>
   <header class="topbar">
-    <a class="brand" href="#/">🎹 <span>Piano Coach</span></a>
+    <a class="brand" href="#/" aria-label="Piano Coach — accueil"><svg class="brand-logo" aria-hidden="true" focusable="false"><use href="#pc-logo"/></svg><span>Piano Coach</span></a>
     <nav class="nav" aria-label="Navigation principale">
-      <a href="#/" data-nav="home"><i aria-hidden="true">🏠</i><span>Accueil</span></a>
-      <a href="#/bibliotheque" data-nav="bibliotheque"><i aria-hidden="true">🎼</i><span>Morceaux</span></a>
-      <a href="#/cours" data-nav="cours"><i aria-hidden="true">🎓</i><span>Cours</span></a>
-      <a href="#/jeux" data-nav="jeux"><i aria-hidden="true">🎮</i><span>Jeux</span></a>
-      <a href="#/progres" data-nav="progres"><i aria-hidden="true">📈</i><span>Progrès</span></a>
+      <a href="#/" data-nav="home"><i aria-hidden="true"><svg class="ico" focusable="false"><use href="#i-home"/></svg></i><span>Accueil</span></a>
+      <a href="#/bibliotheque" data-nav="bibliotheque"><i aria-hidden="true"><svg class="ico" focusable="false"><use href="#i-songs"/></svg></i><span>Morceaux</span></a>
+      <a href="#/cours" data-nav="cours"><i aria-hidden="true"><svg class="ico" focusable="false"><use href="#i-courses"/></svg></i><span>Cours</span></a>
+      <a href="#/jeux" data-nav="jeux"><i aria-hidden="true"><svg class="ico" focusable="false"><use href="#i-games"/></svg></i><span>Jeux</span></a>
+      <a href="#/progres" data-nav="progres"><i aria-hidden="true"><svg class="ico" focusable="false"><use href="#i-progress"/></svg></i><span>Progrès</span></a>
       <details class="nav-more">
-        <summary aria-label="Plus de pages"><i aria-hidden="true">☰</i><span>Plus</span></summary>
+        <summary aria-label="Plus de pages"><i aria-hidden="true"><svg class="ico" focusable="false"><use href="#i-more"/></svg></i><span>Plus</span></summary>
         <div class="nav-menu">
-          <a href="#/accordeur" data-nav="accordeur">🎤 Détecteur</a>
-          <a href="#/importer" data-nav="importer">📂 Importer</a>
-          <a href="#/accords" data-nav="accords">🎹 Grille d’accords</a>
-          <a href="#/glossaire" data-nav="glossaire">📖 Glossaire</a>
-          <a href="#/carnet" data-nav="carnet">📒 Carnet du prof</a>
-          <a href="#/reglages" data-nav="reglages">⚙️ Réglages</a>
-          <a href="#/calibration" data-nav="calibration">🎚️ Calibration</a>
+          <a href="#/accordeur" data-nav="accordeur"><span aria-hidden="true">🎤</span> Détecteur</a>
+          <a href="#/importer" data-nav="importer"><span aria-hidden="true">📂</span> Importer</a>
+          <a href="#/accords" data-nav="accords"><span aria-hidden="true">🎹</span> Grille d’accords</a>
+          <a href="#/glossaire" data-nav="glossaire"><span aria-hidden="true">📖</span> Glossaire</a>
+          <a href="#/carnet" data-nav="carnet"><span aria-hidden="true">📒</span> Carnet du prof</a>
+          <a href="#/reglages" data-nav="reglages"><span aria-hidden="true">⚙️</span> Réglages</a>
+          <a href="#/calibration" data-nav="calibration"><span aria-hidden="true">🎚️</span> Calibration</a>
         </div>
       </details>
     </nav>
     <div id="profile-slot" class="profile-slot"></div>
   </header>
   <main id="main" tabindex="-1">
-    <div class="boot" id="boot"><div class="boot-keys"><span></span><span></span><span></span><span></span><span></span></div><p>Chargement de Piano Coach…</p></div>
+    <div class="boot" id="boot" role="status"><svg class="boot-logo" aria-hidden="true" focusable="false"><use href="#pc-logo"/></svg><div class="boot-keys" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><p>Chargement de Piano Coach…</p></div>
   </main>
   <noscript><p class="card">Piano Coach a besoin de JavaScript pour fonctionner.</p></noscript>
   <script>

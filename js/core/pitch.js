@@ -39,6 +39,7 @@ function diffAt(buf, tau, W) {
  * @param {{threshold?:number, minFreq?:number, maxFreq?:number, minRms?:number}} opts
  * @returns {{freq:number, clarity:number, rms:number, tau:number} | null}
  */
+let cmndScratch = new Float64Array(2050);
 export function detectPitch(buf, sampleRate, opts = {}) {
   const { threshold = 0.15, minFreq = 27.5, maxFreq = 4200, minRms = 0.01 } = opts;
   const level = rms(buf);
@@ -50,8 +51,10 @@ export function detectPitch(buf, sampleRate, opts = {}) {
   const W = n - maxTau;
   if (W < 64 || maxTau <= minTau) return null;
 
-  // Différence moyenne normalisée cumulée, calculée paresseusement
-  const cmnd = new Float64Array(maxTau + 2);
+  // Différence moyenne normalisée cumulée, calculée paresseusement.
+  // Tampon réutilisé d'un appel à l'autre (aucune allocation par trame) : seules les cases ≤ `computed` sont lues.
+  if (cmndScratch.length < maxTau + 2) cmndScratch = new Float64Array(maxTau + 2);
+  const cmnd = cmndScratch;
   cmnd[0] = 1;
   let computed = 0;
   let running = 0;
@@ -179,6 +182,7 @@ export function octaveCheck(buf, sampleRate, freq) {
  * @param {Float32Array} buf échantillons, les plus récents à la fin (≥ longWindow conseillé)
  * @returns {{freq:number|null, clarity:number, rms:number, window:'short'|'long'|null}}
  */
+let decScratch = new Float32Array(0);
 export function detectPitchAdaptive(buf, sampleRate, opts = {}) {
   const { threshold = 0.15, minFreq = 27.5, maxFreq = 4200, minRms = 0.01, splitFreq = 261.6, downsample = true } = opts;
   const scale = Math.max(1, Math.round(sampleRate / 48000));
@@ -192,7 +196,13 @@ export function detectPitchAdaptive(buf, sampleRate, opts = {}) {
   if (Math.max(level, longLevel) < minRms) return out;
 
   const factor = downsample ? decimationFactor(sampleRate) : 1;
-  const dec = factor > 1 ? decimate(long, factor) : long;
+  let dec = long;
+  if (factor > 1) {
+    // tampon de sortie réutilisé (la décimation ne sert que pendant cet appel)
+    const len = Math.floor((long.length - decimationFilter(factor).length) / factor) + 1;
+    if (len > 0 && decScratch.length !== len) decScratch = new Float32Array(len);
+    dec = decimate(long, factor, decScratch);
+  }
   const dsr = sampleRate / factor;
   const coarse = detectPitch(dec, dsr, { threshold, minRms: minRms * 0.5, minFreq, maxFreq: Math.min(maxFreq, dsr / 4) });
 

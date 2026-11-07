@@ -38,14 +38,14 @@
 /* ---------- niveaux ---------- */
 .level-pick { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 .lvl-btn {
-  display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; text-align: left; min-width: 0; max-width: 100%;
+  min-height: var(--tap); display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; text-align: left; min-width: 0; max-width: 100%;
   padding: 7px 12px; border-radius: 11px; border: 1px solid var(--line); background: var(--card2); color: var(--text); font: inherit; cursor: pointer;
 }
 .lvl-btn b { grid-row: span 2; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--bg2); font-size: 0.9rem; }
 .lvl-btn span { font-weight: 600; font-size: 0.9rem; }
 .lvl-btn small { color: var(--muted); font-size: 0.75rem; }
 .lvl-btn.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, var(--card2)); }
-.lvl-btn.on b { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+.lvl-btn.on b { background: var(--grad); color: var(--on-accent); }
 .lvl-btn.locked { opacity: 0.45; cursor: not-allowed; }
 
 .game-setup h2 { margin-top: 0.8em; }
@@ -53,7 +53,6 @@
 .warn-chip { border-color: color-mix(in srgb, var(--warn) 50%, transparent); margin: 2px; }
 .result-card { text-align: center; }
 .result-card .row { justify-content: center; }
-.big-score { font-size: clamp(2.2rem, 8vw, 3.2rem); font-weight: 900; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .big-stars { font-size: 2rem; color: var(--warn); letter-spacing: 4px; }
 .unlock { font-weight: 700; color: var(--ok); animation: pop 0.6s ease-out; }
 
@@ -77,10 +76,13 @@
 .flash-box.ok .fs-head { fill: var(--ok); }
 .flash-box.bad .fs-head { fill: var(--bad); }
 .choice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
+/* Boutons de réponse des jeux (.btn.choice) — l'accueil guidé utilise .pick (profile.css) */
 .choice-grid.wide { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
-.choice { position: relative; padding: 12px 8px; font-size: 1.05rem; min-height: 48px; }
-.choice.black { background: var(--black-key); color: #fff; font-size: 0.85rem; }
-.choice .key-hint { position: absolute; top: 3px; right: 4px; font-size: 0.65rem; opacity: 0.6; }
+.btn.choice { position: relative; padding: 12px 8px; font-size: 1.05rem; min-height: 52px; }
+.btn.choice.good { background: color-mix(in srgb, var(--ok) 26%, var(--card2)); border-color: var(--ok); }
+.btn.choice.bad { background: color-mix(in srgb, var(--bad) 22%, var(--card2)); border-color: var(--bad); }
+.btn.choice.black { background: linear-gradient(var(--black-key-top), var(--black-key)); color: #fff; border-color: var(--key-border); font-size: 0.85rem; }
+.btn.choice .key-hint { position: absolute; top: 3px; right: 4px; font-size: 0.65rem; opacity: 0.6; }
 .flash-kb .piano, .flash-kb.piano { height: 110px; }
 
 /* ---------- rythme ---------- */
@@ -102,13 +104,13 @@
 .r-count.rest { fill: var(--muted); font-weight: 400; }
 .r-ev.now .r-head { fill: var(--warn); stroke: var(--warn); }
 .r-ev.now .r-count { fill: var(--warn); }
-.rhythm-choices .choice { padding: 6px 10px; background: var(--bg2); }
+.rhythm-choices .btn.choice { padding: 6px 10px; background: var(--bg2); }
 .rhythm-choices { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .rhythm-svg.compact .r-count { display: none; }
 .count-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; text-align: center; font-weight: 700; color: var(--muted); }
 .count-grid span { padding: 4px 0; border-radius: 8px; background: var(--card2); transition: background 0.08s, color 0.08s; }
 .count-grid span:nth-child(odd) { color: var(--text); }
-.count-grid span.now { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+.count-grid span.now { background: var(--grad); color: var(--on-accent); }
 .count-grid span.count { background: color-mix(in srgb, var(--warn) 40%, var(--card2)); }
 .tap-pad {
   display: grid; place-items: center; gap: 2px; width: 100%; min-height: 96px; border-radius: 20px; font: inherit; font-size: 2rem; cursor: pointer;
@@ -139,8 +141,8 @@
 
 /* ---------- oreille ---------- */
 .ear-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0 8px; scrollbar-width: thin; }
-.ear-tab { white-space: nowrap; padding: 8px 14px; border-radius: 999px; background: var(--card2); border: 1px solid var(--line); color: var(--text); text-decoration: none; font-weight: 600; font-size: 0.92rem; }
-.ear-tab.on { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; border-color: transparent; }
+.ear-tab { display: inline-flex; align-items: center; min-height: 40px; white-space: nowrap; padding: 8px 14px; border-radius: 999px; background: var(--card2); border: 1px solid var(--line); color: var(--text); text-decoration: none; font-weight: 600; font-size: 0.92rem; }
+.ear-tab.on { background: var(--grad); color: var(--on-accent); border-color: transparent; }
 .ear-card { display: grid; gap: 12px; }
 .ear-card h2 { margin: 0; }
 .ear-top .grow { flex: 1; min-width: 120px; margin: 0; }

@@ -1,0 +1,110 @@
+{
+  "label": "after",
+  "date": "2026-11-07T15:24:50.975Z",
+  "startup": {
+    "fmp": 9288,
+    "startModules": 49,
+    "startKB": 565.6,
+    "startList": [
+      "/js/app.js",
+      "/js/views/index.js",
+      "/js/ui/dom.js",
+      "/js/ui/context.js",
+      "/js/audio/midi-input.js",
+      "/js/audio/synth.js",
+      "/js/core/storage.js",
+      "/js/ui/motion.js",
+      "/js/core/song.js",
+      "/js/core/edit.js",
+      "/js/audio/midi-output.js",
+      "/js/core/notes.js",
+      "/js/data/songs.js",
+      "/js/core/onset.js",
+      "/js/core/achievements.js",
+      "/js/core/fingering.js",
+      "/js/views/library.js",
+      "/js/views/tuner.js",
+      "/js/views/home.js",
+      "/js/views/courses.js",
+      "/js/views/song.js",
+      "/js/views/import.js",
+      "/js/views/progress.js",
+      "/js/views/settings.js",
+      "/js/views/glossary.js",
+      "/js/views/welcome.js",
+      "/js/views/teacher.js",
+      "/js/views/audio-settings.js",
+      "/js/views/calibration.js",
+      "/js/views/games.js",
+      "/js/views/reading.js",
+      "/js/views/rhythm.js",
+      "/js/views/ear.js",
+      "/js/views/chords.js",
+      "/js/views/editor.js",
+      "/js/views/share.js",
+      "/js/views/notation-settings.js",
+      "/js/core/plan.js",
+      "/js/core/coursegen.js",
+      "/js/ui/keyboard.js",
+      "/js/audio/mic.js",
+      "/js/core/pitch.js",
+      "/js/data/lessons.js",
+      "/js/core/spectrum.js",
+      "/js/core/reading.js",
+      "/js/core/rhythmgame.js",
+      "/js/core/eartraining.js",
+      "/js/core/share.js",
+      "/js/ui/shell.js"
+    ],
+    "routes": {
+      "entraîneur": {
+        "modules": 9,
+        "kb": 211.7
+      },
+      "accords": {
+        "modules": 2,
+        "kb": 52.2
+      },
+      "importer": {
+        "modules": 6,
+        "kb": 124.7
+      },
+      "jeux": {
+        "modules": 0,
+        "kb": 0
+      },
+      "éditeur": {
+        "modules": 1,
+        "kb": 14.6
+      }
+    },
+    "fmpRuns": [
+      9307,
+      9252,
+      9288
+    ]
+  },
+  "mic": {
+    "yinMs": 2.2949999999984483,
+    "silentMs": 0.0225,
+    "mainMs": 0.1303999999947846,
+    "frames": 125,
+    "mode": "worklet",
+    "bytesPerFrame": -1143
+  },
+  "trainer": {
+    "song": "cinq-doigts-do",
+    "fps": 60,
+    "worstFrameMs": 17,
+    "longFrames": 0,
+    "scriptMsPerFrame": 0.83,
+    "styleLayoutMsPerFrame": 0.49
+  },
+  "leaks": {
+    "heapGrowthKB": 401,
+    "nodesGrowth": -1,
+    "listenersGrowth": 0,
+    "winDocListenersGrowth": 0,
+    "rafPerSecOnHome": 0
+  }
+}

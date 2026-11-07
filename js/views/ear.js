@@ -2,12 +2,18 @@
 import { makeRng, unlockedCount } from '../core/reading.js';
 import { EAR_EXERCISES, EAR_PASS, QUESTIONS_PER_SESSION, MAX_LISTENS, makeEarQuestion, playDuration, DictationChecker, sessionScore } from '../core/eartraining.js';
 import { prepareSong } from '../core/song.js';
-import { StaffView } from '../ui/staff.js';
 import { PianoKeyboard } from '../ui/keyboard.js';
 import { h } from '../ui/dom.js';
 import * as synth from '../audio/synth.js';
-import { ctx, main, onCleanup, registerRoute } from '../ui/context.js';
+import { ctx, main, onCleanup, registerRoute, withDeps } from '../ui/context.js';
 import { gameData, saveGameData, listenNotes, micToggle, keyboardHint, levelPicker, gameHead, playScheduled, renderRhythm } from './games.js';
+
+// Modules propres à cette page : chargés à la première visite (allègent le démarrage).
+let StaffView;
+async function loadDeps() {
+  const [m0] = await Promise.all([import('../ui/staff.js')]);
+  ({ StaffView } = m0);
+}
 
 function viewEar(query) {
   const data = gameData('ear', { best: {}, levels: {} });
@@ -258,4 +264,4 @@ function viewEar(query) {
   intro();
 }
 
-registerRoute(/^jeux\/oreille$/, viewEar);
+registerRoute(/^jeux\/oreille$/, withDeps(loadDeps, viewEar));

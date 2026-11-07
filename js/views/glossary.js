@@ -1,8 +1,11 @@
 // Vue : glossaire (#/glossaire?q=…)
-import { GLOSSARY_CATEGORIES, searchGlossary } from '../data/glossary.js';
 import { keyDiagram } from '../ui/keyboard.js';
 import { h, speak } from '../ui/dom.js';
-import { main, registerRoute } from '../ui/context.js';
+import { main, registerRoute, withDeps } from '../ui/context.js';
+
+// Données du glossaire chargées à la première visite (allègent le démarrage).
+let GLOSSARY_CATEGORIES, searchGlossary;
+const loadDeps = () => import('../data/glossary.js').then((m) => ({ GLOSSARY_CATEGORIES, searchGlossary } = m));
 
 function termCard(t) {
   return h('article', { class: 'gloss-card', id: 'terme-' + t.id }, [
@@ -31,4 +34,4 @@ function viewGlossary(query) {
   render();
 }
 
-registerRoute(/^glossaire$/, viewGlossary);
+registerRoute(/^glossaire$/, withDeps(loadDeps, viewGlossary));

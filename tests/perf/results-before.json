@@ -1,0 +1,128 @@
+{
+  "label": "before",
+  "date": "2026-11-07T15:12:56.633Z",
+  "startup": {
+    "fmp": 16239,
+    "startModules": 67,
+    "startKB": 967,
+    "startList": [
+      "/js/app.js",
+      "/js/views/index.js",
+      "/js/ui/dom.js",
+      "/js/ui/context.js",
+      "/js/audio/midi-input.js",
+      "/js/audio/synth.js",
+      "/js/core/storage.js",
+      "/js/core/song.js",
+      "/js/core/edit.js",
+      "/js/audio/midi-output.js",
+      "/js/core/notes.js",
+      "/js/data/songs.js",
+      "/js/core/onset.js",
+      "/js/core/achievements.js",
+      "/js/core/fingering.js",
+      "/js/ui/trainer.js",
+      "/js/core/follower.js",
+      "/js/core/spectrum.js",
+      "/js/core/coursegen.js",
+      "/js/core/take.js",
+      "/js/core/practice.js",
+      "/js/core/notation.js",
+      "/js/ui/keyboard.js",
+      "/js/audio/mic.js",
+      "/js/ui/roll.js",
+      "/js/ui/report.js",
+      "/js/parsers/midi.js",
+      "/js/ui/staff.js",
+      "/js/core/pitch.js",
+      "/js/views/library.js",
+      "/js/views/tuner.js",
+      "/js/views/home.js",
+      "/js/views/courses.js",
+      "/js/views/song.js",
+      "/js/views/import.js",
+      "/js/views/progress.js",
+      "/js/views/settings.js",
+      "/js/views/glossary.js",
+      "/js/views/welcome.js",
+      "/js/views/teacher.js",
+      "/js/views/audio-settings.js",
+      "/js/views/calibration.js",
+      "/js/views/games.js",
+      "/js/views/reading.js",
+      "/js/views/rhythm.js",
+      "/js/views/ear.js",
+      "/js/views/chords.js",
+      "/js/views/editor.js",
+      "/js/views/share.js",
+      "/js/views/notation-settings.js",
+      "/js/core/plan.js",
+      "/js/data/lessons.js",
+      "/js/parsers/index.js",
+      "/js/parsers/mxl.js",
+      "/js/parsers/abc.js",
+      "/js/parsers/musicxml.js",
+      "/js/core/transcribe.js",
+      "/js/parsers/xml.js",
+      "/js/core/share.js",
+      "/js/core/theory.js",
+      "/js/core/harmony.js",
+      "/js/core/rhythmgame.js",
+      "/js/core/eartraining.js",
+      "/js/core/reading.js",
+      "/js/ui/shell.js",
+      "/js/data/glossary.js",
+      "/js/ui/editor.js"
+    ],
+    "routes": {
+      "entraîneur": {
+        "modules": 0,
+        "kb": 0
+      },
+      "accords": {
+        "modules": 0,
+        "kb": 0
+      },
+      "importer": {
+        "modules": 0,
+        "kb": 0
+      },
+      "jeux": {
+        "modules": 0,
+        "kb": 0
+      },
+      "éditeur": {
+        "modules": 0,
+        "kb": 0
+      }
+    },
+    "fmpRuns": [
+      16239,
+      16099,
+      16314
+    ]
+  },
+  "mic": {
+    "yinMs": 3.4383333333333335,
+    "silentMs": 0.025499999999883585,
+    "mainMs": 0.2184000000115484,
+    "frames": 125,
+    "mode": "worklet",
+    "bytesPerFrame": 0
+  },
+  "trainer": {
+    "song": "cinq-doigts-do",
+    "fps": 60,
+    "worstFrameMs": 17,
+    "longFrames": 0,
+    "scriptMsPerFrame": 1.24,
+    "styleLayoutMsPerFrame": 0.83
+  },
+  "leaks": {
+    "heapGrowthKB": 879,
+    "nodesGrowth": 8420,
+    "listenersGrowth": 960,
+    "winDocListenersGrowth": 0,
+    "rafPerSecOnHome": 0
+  }
+}

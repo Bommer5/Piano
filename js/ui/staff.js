@@ -740,6 +740,10 @@ export class StaffView {
   setCursor(beat) {
     if (!this.cursor || !this.cursorX) return;
     const x = this.cursorX(beat);
+    // appelé à chaque trame : on ne touche au DOM que si le curseur a bougé
+    if (this.cursor === this._cursorEl && x === this._cursorAt) return;
+    this._cursorEl = this.cursor;
+    this._cursorAt = x;
     this.cursor.setAttribute('x1', x);
     this.cursor.setAttribute('x2', x);
   }

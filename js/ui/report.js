@@ -184,7 +184,7 @@ export function showErrorReview(o) {
 
 /** Confettis légers sur un canvas plein écran (≈ 2 s). */
 export function confetti(n = 90) {
-  if (globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  if (globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches || 'reduceMotion' in document.documentElement.dataset) return; // + réglage « Réduire les animations » (motion.js)
   const c = h('canvas', { class: 'confetti', 'aria-hidden': 'true' });
   document.body.appendChild(c);
   const dpr = devicePixelRatio || 1;

@@ -21,20 +21,18 @@
 .review-legend .lg { display: inline-block; width: 12px; height: 10px; border-radius: 3px; border: 2px solid; margin-left: 6px; }
 .review-legend .lg.ok { border-color: var(--ok); }
 .review-legend .lg.off { border-color: var(--warn); }
-.review-legend .lg.bad { border-color: #9aa0a6; border-style: dashed; }
+.review-legend .lg.bad { border-color: var(--extra); border-style: dashed; }
 
 /* Fenêtre de résultat */
 .take-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 10px; }
-.btn.small { padding: 6px 10px; font-size: 0.9rem; }
 
-/* Par cœur */
 
 /* Revoir mes erreurs */
 dialog.modal.report-dlg { width: min(760px, 96vw); max-height: 92vh; overflow: auto; }
 .rv-staff { border-radius: 10px; margin: 6px 0; min-height: 0; }
-.rv-ok { color: var(--ok); } .rv-bad { color: var(--bad); } .rv-extra { color: #9aa0a6; }
-.staff .extra-note ellipse { fill: #9aa0a6; stroke: #9aa0a6; opacity: 0.85; }
-.staff .extra-note text { fill: #9aa0a6; font-size: 15px; }
+.rv-ok { color: var(--ok); } .rv-bad { color: var(--bad); } .rv-extra { color: var(--extra); }
+.staff .extra-note ellipse { fill: var(--extra); stroke: var(--extra); opacity: 0.85; }
+.staff .extra-note text { fill: var(--extra); font-size: 15px; }
 
 /* Rapport */
 .rep-sec { margin: 12px 0; }
@@ -82,7 +80,7 @@ dialog.modal.report-dlg { width: min(760px, 96vw); max-height: 92vh; overflow: a
 .trainer.kid .piano .key.black { box-shadow: inset 0 -6px 0 color-mix(in srgb, var(--kc) 80%, transparent); }
 .trainer.kid .piano .key.expect-R, .trainer.kid .piano .key.expect-L { background: var(--kc) !important; }
 .trainer.kid .piano .key .label { font-size: 0.8rem; font-weight: 800; }
-.confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 1000; }
+canvas.confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 1000; }
 
 @media (max-width: 760px) {
   .fb-wrap { flex-direction: column; }
@@ -94,3 +92,40 @@ dialog.modal.report-dlg { width: min(760px, 96vw); max-height: 92vh; overflow: a
 .trainer.kid .adv-opts { display: none; }
 .trainer .roll-wrap { height: clamp(140px, 26vh, 360px); }
 .rep-chart.small { max-width: 380px; }
+
+/* ---------- Mobile portrait : barre de statistiques compacte (la portée reste au-dessus de la ligne de flottaison) ---------- */
+@media (max-width: 760px) {
+  .trainer .controls { padding: 8px; gap: 6px; }
+  .trainer .hud { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'fb fb' 'stats det'; gap: 6px; margin: 4px 0 6px; }
+  .trainer .fb-wrap { grid-area: fb; }
+  .trainer .feedback { font-size: 0.98rem; min-height: 40px; padding: 7px 10px; }
+  .trainer.kid .feedback { font-size: 1.15rem; }
+  .trainer .stats { grid-area: stats; gap: 4px; justify-content: flex-start; min-width: 0; }
+  .trainer .stat { min-width: 0; flex: 1 1 0; padding: 3px 6px; border-radius: var(--r-sm); line-height: 1.15; }
+  .trainer .stat b { font-size: 1.02rem; }
+  .trainer .stat small { font-size: 0.66rem; white-space: nowrap; }
+  .trainer .detected { grid-area: det; width: auto; grid-template-columns: auto auto; column-gap: 6px; align-items: center; padding: 3px 8px; border-radius: var(--r-sm); }
+  .trainer .det-note { font-size: 0.95rem; min-width: 2.2em; }
+  .trainer .detected .level { grid-column: 1 / -1; min-width: 0; }
+  .trainer .cents { width: 64px; }
+  .trainer .needle { left: 30px; }
+  .trainer .progress { margin: 4px 0; }
+  .trainer .staff-wrap { min-height: 0; }
+  .trainer .roll-wrap { height: clamp(120px, 21vh, 220px); }
+  .trainer .hint-line { display: none; }
+}
+
+/* ---------- Mobile paysage : portée + clavier tiennent dans l'écran ---------- */
+@media (orientation: landscape) and (max-height: 520px) {
+  body:has(.trainer) { padding-bottom: 0; }
+  html:has(.trainer) { scroll-padding: 0; }
+  body:has(.trainer) .nav { display: none; }
+  body:has(.trainer) .topbar { position: static; }
+  .trainer .hud { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: none; margin: 4px 0; }
+  .trainer .hud > * { grid-area: auto; }
+  .trainer .feedback { min-height: 34px; padding: 5px 10px; font-size: 0.95rem; }
+  .trainer .staff-wrap { min-height: 0; }
+  .trainer .roll-wrap { height: 10vh; min-height: 34px; }
+  .trainer .piano { height: 24vh; min-height: 76px; }
+  .trainer .hint-line { display: none; }
+}

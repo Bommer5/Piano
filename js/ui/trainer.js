@@ -76,7 +76,9 @@ export class Trainer {
     this.build();
     this.loadSong();
     this.bindInputs();
-    this.raf = requestAnimationFrame(() => this.frame());
+    // une seule boucle d'affichage (rAF), suspendue quand l'onglet est caché
+    this._frame = () => this.frame();
+    this.raf = requestAnimationFrame(this._frame);
   }
 
   later(fn, ms) {
@@ -167,7 +169,7 @@ export class Trainer {
     this.el.feedback = h('div', { class: 'feedback', 'aria-live': 'polite' }, 'Prêt ? Appuie sur Démarrer, puis joue !');
     this.el.turn = h('div', { class: 'imitate-turn hidden', 'aria-live': 'assertive' });
     this.el.score = h('div', { class: 'stat' }, [h('b', {}, '0'), h('small', {}, 'notes justes')]);
-    this.el.streak = h('div', { class: 'stat' }, [h('b', {}, '0'), h('small', {}, 'série')]);
+    this.el.streak = h('div', { class: 'stat', 'data-motion': 'streak' }, [h('b', {}, '0'), h('small', {}, 'série')]);
     this.el.acc = h('div', { class: 'stat' }, [h('b', {}, '–'), h('small', {}, 'précision')]);
     this.el.detected = h('div', { class: 'detected' }, [h('div', { class: 'det-note' }, '—'), h('div', { class: 'cents' }, [h('div', { class: 'needle' })]), h('div', { class: 'level' }, [h('div', { class: 'bar' })])]);
     this.el.progress = h('div', { class: 'progress' }, h('div', { class: 'fill' }));
@@ -448,6 +450,7 @@ export class Trainer {
     this._vis = () => {
       if (document.hidden && this.playing && this.clockRunning && this.opts.mode !== 'concert') this.pause();
       if (!document.hidden && this.opts.mode === 'concert') this.requestWakeLock();
+      if (!document.hidden && !this.raf && !this.destroyed) this.raf = requestAnimationFrame(this._frame);
     };
     document.addEventListener('visibilitychange', this._vis);
     this._fs = () => this.root.classList.toggle('fullscreen', document.fullscreenElement === this.root);
@@ -1146,7 +1149,7 @@ export class Trainer {
       if (Math.abs(target - this.beat) < 0.001) this.beat = target;
     }
     this.render();
-    this.raf = requestAnimationFrame(() => this.frame());
+    this.raf = document.hidden ? 0 : requestAnimationFrame(this._frame);
   }
 
   render() {
@@ -1211,8 +1214,15 @@ export class Trainer {
       });
       for (const [id, st] of this.roll.state) this.staff.mark(id, st);
     }
-    this.staff.clearMarks('current');
-    if (this.opts.mode !== 'concert') for (const id of current) if (!this.roll.state.get(id)) this.staff.mark(id, 'current');
+    // marques « note courante » : refaites seulement si la page, les états ou les notes courantes ont changé
+    // (évite de retirer/remettre la classe à chaque trame, ce qui forçait un recalcul de style)
+    let markKey = key + '|' + this.roll.state.version + '|' + this.opts.mode + '|';
+    for (const id of current) markKey += id + ',';
+    if (markKey !== this._staffMarkKey) {
+      this._staffMarkKey = markKey;
+      this.staff.clearMarks('current');
+      if (this.opts.mode !== 'concert') for (const id of current) if (!this.roll.state.get(id)) this.staff.mark(id, 'current');
+    }
     this.staff.setCursor(beat);
   }
 

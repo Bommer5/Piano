@@ -5,6 +5,7 @@ import { computerKeyboard } from './audio/midi-input.js';
 import { h, toast } from './ui/dom.js';
 import { ctx, main, routes, applyTheme, findSong } from './ui/context.js';
 import { failedViews } from './views/index.js';
+import './ui/motion.js'; // animations + réglage « Réduire les animations » (agent design)
 
 function parseHash() {
   const raw = location.hash.replace(/^#\/?/, '');

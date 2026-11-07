@@ -1,20 +1,12 @@
 // Vue : tuner
-import { GENRES, SONGS, getSong } from '../data/songs.js';
-import { COURSES, getCourse, getLesson } from '../data/lessons.js';
-import { prepareSong, phrases, parseTrack } from '../core/song.js';
-import { generateSongCourse, describePosition } from '../core/coursegen.js';
-import { noteLabel, midiToName, nameToMidi, centsOff, midiToFreq } from '../core/notes.js';
+import { noteLabel, midiToName, centsOff } from '../core/notes.js';
 import { estimateNotes } from '../core/spectrum.js';
 import { PitchSmoother } from '../core/onset.js';
-import { store, DEFAULT_SETTINGS, localDate } from '../core/storage.js';
-import { importScoreFile, importScoreText, SUPPORTED_FORMATS, exportSong } from '../parsers/index.js';
-import { keyDiagram, PianoKeyboard } from '../ui/keyboard.js';
-import { StaffView } from '../ui/staff.js';
-import { h, toast, modal, download, escapeHtml, stars } from '../ui/dom.js';
+import { PianoKeyboard } from '../ui/keyboard.js';
+import { h, modal, escapeHtml } from '../ui/dom.js';
 import * as synth from '../audio/synth.js';
 import { mic } from '../audio/mic.js';
-import { midiInput, computerKeyboard } from '../audio/midi-input.js';
-import { ctx, main, onCleanup, registerRoute, findSong, allSongs, genreOf, levelLabel, applyTheme, section, statCard, songCard, startTrainer, settingsSections, homeSections } from '../ui/context.js';
+import { ctx, main, onCleanup, registerRoute, section } from '../ui/context.js';
 
 // ---------- Détecteur / accordeur ----------
 function viewTuner() {

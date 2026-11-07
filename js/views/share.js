@@ -1,11 +1,24 @@
 // Vue : partage par lien (#/partage?d=…) + boîte de dialogue « Partager » de la fiche morceau.
 import { buildShareUrl, decodeSong, parseShareQuery, SHARE_MAX_CHARS, compressionSupported } from '../core/share.js';
 import { prepareSong } from '../core/song.js';
-import { exportSong } from '../parsers/index.js';
 import { store } from '../core/storage.js';
-import { StaffView } from '../ui/staff.js';
 import { h, toast, modal, download } from '../ui/dom.js';
-import { ctx, main, registerRoute, genreOf, levelLabel } from '../ui/context.js';
+import { ctx, main, registerRoute, genreOf, levelLabel, withDeps } from '../ui/context.js';
+
+// Modules propres à cette page : chargés à la première visite (allègent le démarrage).
+let StaffView;
+async function loadDeps() {
+  const [m0] = await Promise.all([import('../ui/staff.js')]);
+  ({ StaffView } = m0);
+}
+
+/** Export (module des formats chargé à la demande). */
+function exportAs(song, format) {
+  import('../parsers/index.js').then(({ exportSong }) => {
+    const f = exportSong(song, format);
+    download(f.filename, f.data, f.mime);
+  }).catch((err) => toast('Export impossible : ' + err.message));
+}
 
 const shareBase = () => location.origin + location.pathname;
 
@@ -36,9 +49,9 @@ export function openShareDialog(song) {
       if (res.tooLong) {
         out.append(h('div', { class: 'block warning' }, [
           `Ce morceau est trop long pour un lien (${(res.chars / 1000).toFixed(1)} Ko > ${SHARE_MAX_CHARS / 1000} Ko). Exporte-le plutôt en fichier et envoie-le : `,
-          h('button', { class: 'btn tiny', onclick: () => { const f = exportSong(song, 'musicxml'); download(f.filename, f.data, f.mime); } }, '⬇ MusicXML'),
+          h('button', { class: 'btn tiny', onclick: () => exportAs(song, 'musicxml') }, '⬇ MusicXML'),
           ' ',
-          h('button', { class: 'btn tiny', onclick: () => { const f = exportSong(song, 'midi'); download(f.filename, f.data, f.mime); } }, '⬇ MIDI'),
+          h('button', { class: 'btn tiny', onclick: () => exportAs(song, 'midi') }, '⬇ MIDI'),
         ]));
         return;
       }
@@ -128,4 +141,4 @@ function viewShare(query) {
   });
 }
 
-registerRoute(/^partage$/, viewShare);
+registerRoute(/^partage$/, withDeps(loadDeps, viewShare));

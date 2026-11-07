@@ -1,8 +1,6 @@
 // Vue : grille d'accords (#/accords) — éditeur de grille en texte, écoute (basse + voicings),
 // entraînement (l'app attend un accord dont les classes de hauteurs correspondent), exercice
 // « dans les 12 tons », et détecteur d'accord libre (MIDI / clavier / souris / micro).
-import { parseProgression, parseChord, chordMatches, identifyChord, voicing, transposeProgression, romanNumeral, keyName, mod12, EXAMPLE_GRIDS, INVERSION_NAMES, chordPcs, FUNCTION_NAMES } from '../core/harmony.js';
-import { rankKeys } from '../core/theory.js';
 import { noteLabel } from '../core/notes.js';
 import { matchChord, estimateNotes } from '../core/spectrum.js';
 import { PianoKeyboard } from '../ui/keyboard.js';
@@ -10,7 +8,15 @@ import { h, toast } from '../ui/dom.js';
 import * as synth from '../audio/synth.js';
 import { mic } from '../audio/mic.js';
 import { midiInput, computerKeyboard } from '../audio/midi-input.js';
-import { ctx, main, onCleanup, registerRoute, section, homeSections } from '../ui/context.js';
+import { ctx, main, onCleanup, registerRoute, section, homeSections, withDeps } from '../ui/context.js';
+
+// Modules propres à cette page : chargés à la première visite (allègent le démarrage).
+let parseProgression, parseChord, chordMatches, identifyChord, voicing, transposeProgression, romanNumeral, keyName, mod12, EXAMPLE_GRIDS, INVERSION_NAMES, chordPcs, FUNCTION_NAMES, rankKeys;
+async function loadDeps() {
+  const [m0, m1] = await Promise.all([import('../core/harmony.js'), import('../core/theory.js')]);
+  ({ parseProgression, parseChord, chordMatches, identifyChord, voicing, transposeProgression, romanNumeral, keyName, mod12, EXAMPLE_GRIDS, INVERSION_NAMES, chordPcs, FUNCTION_NAMES } = m0);
+  ({ rankKeys } = m1);
+}
 
 const LS_KEY = 'chordgrid';
 
@@ -409,6 +415,6 @@ function viewChords(query = {}) {
   refresh();
 }
 
-registerRoute(/^accords$/, viewChords);
+registerRoute(/^accords$/, withDeps(loadDeps, viewChords));
 
 homeSections.push(() => h('a', { class: 'card home-chords', href: '#/accords' }, [h('b', {}, '🎹 Grille d’accords'), h('p', { class: 'small muted' }, 'ii–V–I, blues, pop : joue les accords dans les 12 tons, avec détecteur d’accord.')]));

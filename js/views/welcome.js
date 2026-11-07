@@ -5,7 +5,7 @@ import { COURSES } from '../data/lessons.js';
 import { store, AVATARS } from '../core/storage.js';
 import { midiToName } from '../core/notes.js';
 import { PianoKeyboard } from '../ui/keyboard.js';
-import { h, toast, speak } from '../ui/dom.js';
+import { h, speak } from '../ui/dom.js';
 import * as synth from '../audio/synth.js';
 import { mic } from '../audio/mic.js';
 import { midiInput, computerKeyboard } from '../audio/midi-input.js';
@@ -54,8 +54,8 @@ function viewWelcome(query) {
       type: 'button', class: 'avatar-btn' + (a === avatar ? ' on' : ''), role: 'radio', 'aria-checked': String(a === avatar), 'aria-label': 'Avatar ' + a,
       onclick: (e) => { avatar = a; avatars.querySelectorAll('.avatar-btn').forEach((b) => { b.classList.toggle('on', b === e.currentTarget); b.setAttribute('aria-checked', String(b === e.currentTarget)); }); },
     }, a)));
-    const who = h('div', { class: 'choice-grid two', role: 'radiogroup', 'aria-label': 'Qui joue ?' }, [['adult', '🧑', 'Un adulte (ou un ado)', 'Interface complète'], ['child', '🧒', 'Un enfant', 'Mode enfant : gros boutons, consignes simples, lecture vocale']].map(([id, e, t, d]) =>
-      h('button', { type: 'button', class: 'choice' + (player === id ? ' on' : ''), role: 'radio', 'aria-checked': String(player === id), 'data-player': id, onclick: (ev) => { player = id; who.querySelectorAll('.choice').forEach((b) => { b.classList.toggle('on', b === ev.currentTarget); b.setAttribute('aria-checked', String(b === ev.currentTarget)); }); } }, [h('span', { class: 'choice-emoji' }, e), h('b', {}, t), h('small', {}, d)])));
+    const who = h('div', { class: 'pick-grid two', role: 'radiogroup', 'aria-label': 'Qui joue ?' }, [['adult', '🧑', 'Un adulte (ou un ado)', 'Interface complète'], ['child', '🧒', 'Un enfant', 'Mode enfant : gros boutons, consignes simples, lecture vocale']].map(([id, e, t, d]) =>
+      h('button', { type: 'button', class: 'choice pick' + (player === id ? ' on' : ''), role: 'radio', 'aria-checked': String(player === id), 'data-player': id, onclick: (ev) => { player = id; who.querySelectorAll('.choice').forEach((b) => { b.classList.toggle('on', b === ev.currentTarget); b.setAttribute('aria-checked', String(b === ev.currentTarget)); }); } }, [h('span', { class: 'pick-emoji' }, e), h('b', {}, t), h('small', {}, d)])));
     card.append(
       h('h1', {}, 'Bienvenue dans Piano Coach ! 🎹'),
       h('p', { class: 'lead' }, 'Quelques questions pour préparer ton espace (1 minute).'),
@@ -108,11 +108,11 @@ function viewWelcome(query) {
         extra.append(h('p', { class: 'small' }, ['Tu peux cliquer (ou toucher) les touches à l’écran, ou utiliser ton clavier d’ordinateur : ', h('kbd', {}, 'A'), ' = Do, ', h('kbd', {}, 'Z'), '/', h('kbd', {}, 'E'), '… pour les notes suivantes.']));
       }
     };
-    const grid = h('div', { class: 'choice-grid', role: 'radiogroup', 'aria-label': 'Comment tu joues ?' }, [
+    const grid = h('div', { class: 'pick-grid', role: 'radiogroup', 'aria-label': 'Comment tu joues ?' }, [
       ['midi', '🎹', 'Clavier MIDI / piano numérique', 'Le plus précis : branché en USB.'],
       ['mic', '🎤', 'Piano acoustique (micro)', 'L’app écoute ton piano.'],
       ['keyboard', '⌨️', 'Clavier d’ordinateur ou souris', 'Pour essayer sans piano.'],
-    ].map(([id, e, t, d]) => h('button', { type: 'button', class: 'choice', role: 'radio', 'aria-checked': 'false', 'data-input': id, onclick: () => pick(id) }, [h('span', { class: 'choice-emoji' }, e), h('b', {}, t), h('small', {}, d)])));
+    ].map(([id, e, t, d]) => h('button', { type: 'button', class: 'choice pick', role: 'radio', 'aria-checked': 'false', 'data-input': id, onclick: () => pick(id) }, [h('span', { class: 'pick-emoji' }, e), h('b', {}, t), h('small', {}, d)])));
     card.append(h('h1', {}, 'Comment tu joues ?'), grid, extra, nav('Continuer →', () => {
       saveSettings({ inputMode: mode || 'keyboard', midiLocalSound: mode === 'midi' ? store.settings().midiLocalSound : true });
       go(idx + 1);
@@ -161,8 +161,8 @@ function viewWelcome(query) {
     void found;
   } else if (STEPS[idx] === 'objectif') {
     let goal = [5, 10, 15].includes(s.dailyGoalMin) ? s.dailyGoalMin : 10;
-    const grid = h('div', { class: 'choice-grid three', role: 'radiogroup', 'aria-label': 'Objectif quotidien' }, [[5, '🌱', 'Tranquille'], [10, '🌿', 'Régulier'], [15, '🌳', 'Motivé']].map(([m, e, t]) =>
-      h('button', { type: 'button', class: 'choice' + (goal === m ? ' on' : ''), role: 'radio', 'aria-checked': String(goal === m), 'data-goal': m, onclick: (ev) => { goal = m; grid.querySelectorAll('.choice').forEach((b) => { b.classList.toggle('on', b === ev.currentTarget); b.setAttribute('aria-checked', String(b === ev.currentTarget)); }); } }, [h('span', { class: 'choice-emoji' }, e), h('b', {}, `${m} min / jour`), h('small', {}, t)])));
+    const grid = h('div', { class: 'pick-grid three', role: 'radiogroup', 'aria-label': 'Objectif quotidien' }, [[5, '🌱', 'Tranquille'], [10, '🌿', 'Régulier'], [15, '🌳', 'Motivé']].map(([m, e, t]) =>
+      h('button', { type: 'button', class: 'choice pick' + (goal === m ? ' on' : ''), role: 'radio', 'aria-checked': String(goal === m), 'data-goal': m, onclick: (ev) => { goal = m; grid.querySelectorAll('.choice').forEach((b) => { b.classList.toggle('on', b === ev.currentTarget); b.setAttribute('aria-checked', String(b === ev.currentTarget)); }); } }, [h('span', { class: 'pick-emoji' }, e), h('b', {}, `${m} min / jour`), h('small', {}, t)])));
     card.append(h('h1', {}, 'Ton objectif quotidien 🎯'), h('p', {}, 'Un peu chaque jour vaut mieux que beaucoup une fois par semaine. Tu gagnes un gel de série ❄️ tous les 7 jours d’affilée.'), grid, nav('Continuer →', () => { saveSettings({ dailyGoalMin: goal }); go(idx + 1); }));
     say('Choisis ton objectif quotidien : 5, 10 ou 15 minutes.');
   } else {

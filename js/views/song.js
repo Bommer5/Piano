@@ -1,23 +1,22 @@
 // Vue : song
-import { GENRES, SONGS, getSong } from '../data/songs.js';
-import { COURSES, getCourse, getLesson } from '../data/lessons.js';
-import { prepareSong, phrases, parseTrack } from '../core/song.js';
-import { generateSongCourse, describePosition } from '../core/coursegen.js';
-import { noteLabel, midiToName, nameToMidi, centsOff, midiToFreq } from '../core/notes.js';
-import { estimateNotes } from '../core/spectrum.js';
-import { PitchSmoother } from '../core/onset.js';
-import { store, DEFAULT_SETTINGS, localDate } from '../core/storage.js';
-import { importScoreFile, importScoreText, SUPPORTED_FORMATS, exportSong } from '../parsers/index.js';
-import { keyDiagram, PianoKeyboard } from '../ui/keyboard.js';
-import { StaffView } from '../ui/staff.js';
+import { phrases } from '../core/song.js';
+import { describePosition } from '../core/coursegen.js';
+import { noteLabel } from '../core/notes.js';
+import { store } from '../core/storage.js';
+import { keyDiagram } from '../ui/keyboard.js';
 import { h, toast, modal, download, escapeHtml, stars } from '../ui/dom.js';
 import * as synth from '../audio/synth.js';
-import { mic } from '../audio/mic.js';
-import { midiInput, computerKeyboard } from '../audio/midi-input.js';
-import { analyzeSong, generateQuiz } from '../core/theory.js';
-import { parseChord, voicing, FUNCTION_NAMES, keyName, progressionToText } from '../core/harmony.js';
 import { openShareDialog } from './share.js';
-import { ctx, main, onCleanup, registerRoute, findSong, allSongs, genreOf, levelLabel, applyTheme, section, statCard, songCard, startTrainer, settingsSections, homeSections } from '../ui/context.js';
+import { ctx, main, registerRoute, findSong, genreOf, levelLabel, section, startTrainer, withDeps } from '../ui/context.js';
+
+// Modules propres à la fiche (théorie, harmonie, portée) : chargés à la première ouverture d'une fiche.
+let analyzeSong, generateQuiz, voicing, FUNCTION_NAMES, keyName, progressionToText, StaffView;
+async function loadFicheDeps() {
+  const [theory, harmony, staff] = await Promise.all([import('../core/theory.js'), import('../core/harmony.js'), import('../ui/staff.js')]);
+  ({ analyzeSong, generateQuiz } = theory);
+  ({ voicing, FUNCTION_NAMES, keyName, progressionToText } = harmony);
+  ({ StaffView } = staff);
+}
 
 // ---------- Fiche morceau ----------
 function viewSong(id) {
@@ -31,12 +30,10 @@ function viewSong(id) {
     const f = e.target.value;
     e.target.value = '';
     if (!f) return;
-    try {
+    import('../parsers/index.js').then(({ exportSong }) => {
       const out = exportSong(s, f);
       download(out.filename, out.data, out.mime);
-    } catch (err) {
-      toast('Export impossible : ' + err.message);
-    }
+    }).catch((err) => toast('Export impossible : ' + err.message));
   } }, [h('option', { value: '' }, '⬇ Exporter…'), h('option', { value: 'midi' }, 'MIDI (.mid)'), h('option', { value: 'musicxml' }, 'MusicXML (.musicxml)'), h('option', { value: 'text' }, 'Texte (.txt)'), h('option', { value: 'json' }, 'JSON')]);
 
   let analysis = null;
@@ -210,5 +207,5 @@ function viewPlay(id, query) {
 }
 
 
-registerRoute(/^morceau\/(.+)$/, viewSong)
+registerRoute(/^morceau\/(.+)$/, withDeps(loadFicheDeps, viewSong))
 registerRoute(/^jouer\/(.+)$/, viewPlay)
