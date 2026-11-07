@@ -113,6 +113,9 @@ function scaleTrack(start, acc, fingersUp) {
 const RH_SCALE = [1, 2, 3, 1, 2, 3, 4, 1, 2, 3, 1, 2, 3, 4, 5];
 const LH_SCALE = [5, 4, 3, 2, 1, 3, 2, 1, 4, 3, 2, 1, 3, 2, 1];
 const RH_SCALE_F = [1, 2, 3, 4, 1, 2, 3, 1, 2, 3, 4, 1, 2, 3, 4];
+// Si♭ majeur : le pouce seulement sur Do et Fa (touches blanches)
+const RH_SCALE_BB = [4, 1, 2, 3, 1, 2, 3, 4, 1, 2, 3, 1, 2, 3, 4];
+const LH_SCALE_BB = [3, 2, 1, 4, 3, 2, 1, 3, 2, 1, 4, 3, 2, 1, 3];
 
 function dName(d) {
   return LETTERS[d % 7] + Math.floor(d / 7);
@@ -1042,6 +1045,282 @@ export const SONGS = [
       })(),
       L: rep('C3:4:5', 4) + ' | ' + rep('F2:4:5', 4) + ' | ' + rep('G2:4:5', 4) + ' | C3:4:5',
     },
+  },
+
+  // ===================== AJOUTS : DOMAINE PUBLIC (arrangements originaux) =====================
+  // Sources et statut juridique : docs/SOURCES.md
+  {
+    id: 'petits-pains-chauds',
+    title: 'Petits pains chauds (Hot Cross Buns)',
+    composer: 'Traditionnel anglais',
+    genre: 'debutant',
+    level: 1,
+    tempo: 84,
+    timeSig: [4, 4],
+    keyFifths: 0,
+    description:
+      'Trois notes seulement : Mi-Ré-Do avec les doigts 3-2-1. La troisième mesure passe aux croches : comptez « 1 et 2 et » et gardez les Do et les Ré bien égaux.',
+    tags: ['3 notes', 'croches', 'position de Do'],
+    tracks: {
+      R: 'E4:1:3 D4:1:2 C4:2:1 | E4:1:3 D4:1:2 C4:2:1 | C4:0.5:1 C4:0.5:1 C4:0.5:1 C4:0.5:1 D4:0.5:2 D4:0.5:2 D4:0.5:2 D4:0.5:2 | E4:1:3 D4:1:2 C4:2:1',
+      L: 'C3+G3:4:5+1 | C3+G3:4:5+1 | C3:2:5 G3:2:1 | C3+G3:4:5+1',
+    },
+  },
+  {
+    id: 'petits-canards',
+    title: 'Tous mes petits canards (Alle meine Entchen)',
+    composer: 'Traditionnel allemand',
+    genre: 'debutant',
+    level: 1,
+    tempo: 88,
+    timeSig: [4, 4],
+    keyFifths: 0,
+    description:
+      'La comptine allemande la plus connue. Nouveauté : on change de doigt sur une note répétée (Sol joué 5 puis 4, Fa joué 3 puis 4) pour déplacer la main d’une touche sans aucun saut.',
+    tags: ['changement de doigt', 'notes répétées', 'position de Do'],
+    tracks: {
+      R: 'C4:1:1 D4:1:2 E4:1:3 F4:1:4 | G4:2:5 G4:2:4 | A4:1:5 A4:1:5 A4:1:5 A4:1:5 | G4:4:4 | A4:1:5 A4:1:5 A4:1:5 A4:1:5 | G4:4:4 | F4:1:3 F4:1:3 F4:1:3 F4:1:4 | E4:2:3 E4:2:3 | D4:1:2 D4:1:2 D4:1:2 D4:1:2 | C4:4:1',
+      L: 'C3+G3:4:5+1 | C3+G3:4:5+1 | C3+F3:4:5+2 | C3+E3:4:5+3 | C3+F3:4:5+2 | C3+E3:4:5+3 | G3:4:1 | C3+G3:4:5+1 | G3:4:1 | C3:4:5',
+    },
+  },
+  {
+    id: 'marie-agneau',
+    title: 'Marie avait un petit agneau',
+    composer: 'Traditionnel américain (air attribué à Lowell Mason)',
+    genre: 'comptines',
+    level: 1,
+    tempo: 96,
+    timeSig: [4, 4],
+    keyFifths: 0,
+    description:
+      '« Mary Had a Little Lamb » : une mélodie en vagues sur Do-Ré-Mi, avec un seul petit saut vers le Sol (doigt 5). La main gauche alterne Do et Sol.',
+    tags: ['chanson', 'position de Do', 'notes répétées'],
+    tracks: {
+      R: 'E4:1:3 D4:1:2 C4:1:1 D4:1:2 | E4:1:3 E4:1:3 E4:2:3 | D4:1:2 D4:1:2 D4:2:2 | E4:1:3 G4:1:5 G4:2:5 | E4:1:3 D4:1:2 C4:1:1 D4:1:2 | E4:1:3 E4:1:3 E4:1:3 E4:1:3 | D4:1:2 D4:1:2 E4:1:3 D4:1:2 | C4:4:1',
+      L: 'C3+G3:4:5+1 | C3+G3:4:5+1 | G3:4:1 | C3+G3:4:5+1 | C3+G3:4:5+1 | C3+G3:4:5+1 | G3:4:1 | C3:4:5',
+    },
+  },
+  {
+    id: 'pont-de-londres',
+    title: 'Le pont de Londres (London Bridge)',
+    composer: 'Traditionnel anglais',
+    genre: 'comptines',
+    level: 1,
+    tempo: 96,
+    timeSig: [4, 4],
+    keyFifths: 0,
+    description:
+      'Position de Ré (pouce sur Ré, auriculaire sur La) ; à la toute fin, le pouce s’étire jusqu’au Do. Le premier temps est pointé : « taaa-ta ».',
+    tags: ['chanson', 'rythme pointé', 'extension du pouce'],
+    tracks: {
+      R: 'G4:1.5:4 A4:0.5:5 G4:1:4 F4:1:3 | E4:1:2 F4:1:3 G4:2:4 | D4:1:1 E4:1:2 F4:2:3 | E4:1:2 F4:1:3 G4:2:4 | G4:1.5:4 A4:0.5:5 G4:1:4 F4:1:3 | E4:1:2 F4:1:3 G4:2:4 | D4:2:1 G4:2:4 | E4:1:2 C4:3:1',
+      L: 'C3+G3:4:5+1 | C3+G3:4:5+1 | G3:4:1 | C3+G3:4:5+1 | C3+G3:4:5+1 | C3+G3:4:5+1 | G3:4:1 | C3+G3:4:5+1',
+    },
+  },
+  {
+    id: 'petit-jean',
+    title: 'Petit Jean (Hänschen klein)',
+    composer: 'Traditionnel allemand',
+    genre: 'comptines',
+    level: 1,
+    tempo: 100,
+    timeSig: [4, 4],
+    keyFifths: 0,
+    description:
+      'Une chanson entièrement en position de Do, avec des tierces (Sol-Mi, Fa-Ré) qui sautent une touche. La partie du milieu répète Ré puis Mi quatre fois : gardez un son bien égal.',
+    tags: ['chanson', 'position de Do', 'tierces'],
+    tracks: {
+      R: 'G4:1:5 E4:1:3 E4:2:3 | F4:1:4 D4:1:2 D4:2:2 | C4:1:1 D4:1:2 E4:1:3 F4:1:4 | G4:1:5 G4:1:5 G4:2:5 | G4:1:5 E4:1:3 E4:2:3 | F4:1:4 D4:1:2 D4:2:2 | C4:1:1 E4:1:3 G4:1:5 G4:1:5 | C4:4:1 | D4:1:2 D4:1:2 D4:1:2 D4:1:2 | D4:1:2 E4:1:3 F4:2:4 | E4:1:3 E4:1:3 E4:1:3 E4:1:3 | E4:1:3 F4:1:4 G4:2:5 | G4:1:5 E4:1:3 E4:2:3 | F4:1:4 D4:1:2 D4:2:2 | C4:1:1 E4:1:3 G4:1:5 G4:1:5 | C4:4:1',
+      L: 'C3+G3:4:5+1 | G3:4:1 | C3:4:5 | C3+E3:4:5+3 | C3+G3:4:5+1 | G3:4:1 | C3+E3:4:5+3 | C3:4:5 | G3:4:1 | G3:4:1 | C3+G3:4:5+1 | C3+E3:4:5+3 | C3+G3:4:5+1 | G3:4:1 | C3+E3:4:5+3 | C3:4:5',
+    },
+  },
+  {
+    id: 'ferme-mathurin',
+    title: 'Dans la ferme de Mathurin',
+    composer: 'Traditionnel (air de « Old MacDonald »)',
+    genre: 'comptines',
+    level: 1,
+    tempo: 100,
+    timeSig: [4, 4],
+    keyFifths: 1,
+    description:
+      'Une position à cinq doigts un peu spéciale : Ré-Mi-Sol-La-Si (on saute le Fa♯), pouce sur Ré. Le pouce n’a jamais besoin de bouger !',
+    tags: ['chanson', 'Sol majeur', 'pentatonique'],
+    tracks: {
+      R: 'G4:1:3 G4:1:3 G4:1:3 D4:1:1 | E4:1:2 E4:1:2 D4:2:1 | B4:1:5 B4:1:5 A4:1:4 A4:1:4 | G4:3:3 D4:1:1 | G4:1:3 G4:1:3 G4:1:3 D4:1:1 | E4:1:2 E4:1:2 D4:2:1 | B4:1:5 B4:1:5 A4:1:4 A4:1:4 | G4:4:3',
+      L: 'G2:4:5 | C3:2:2 G2:2:5 | D3:4:1 | G2:4:5 | G2:4:5 | C3:2:2 G2:2:5 | D3:4:1 | G2:4:5',
+    },
+  },
+  {
+    id: 'rame-doucement',
+    title: 'Rame, rame doucement (Row, Row, Row Your Boat)',
+    composer: 'Eliphalet Oram Lyte (1842-1913)',
+    genre: 'comptines',
+    level: 2,
+    tempo: 96,
+    timeSig: [6, 8],
+    keyFifths: 0,
+    description:
+      'Une barcarolle en 6/8 : deux grands temps qui se balancent. Après la note longue, la main monte (pouce sur Sol) pour les triolets de croches, puis le 3e doigt passe par-dessus le pouce pour revenir en position de Do.',
+    tags: ['6/8', 'canon', 'passage du 3e doigt'],
+    tracks: {
+      R: 'C4:1.5:1 C4:1.5:1 | C4:1:1 D4:0.5:2 E4:1.5:3 | E4:1:3 D4:0.5:2 E4:1:3 F4:0.5:4 | G4:3:5 | C5:0.5:4 C5:0.5:4 C5:0.5:4 G4:0.5:1 G4:0.5:1 G4:0.5:1 | E4:0.5:3 E4:0.5:3 E4:0.5:3 C4:0.5:1 C4:0.5:1 C4:0.5:1 | G4:1:5 F4:0.5:4 E4:1:3 D4:0.5:2 | C4:3:1',
+      L: 'C3+G3:3:5+1 | C3+G3:3:5+1 | C3+G3:3:5+1 | C3+G3:3:5+1 | C3+G3:3:5+1 | C3+G3:3:5+1 | G3:3:1 | C3+G3:3:5+1',
+    },
+  },
+  {
+    id: 'drunken-sailor',
+    title: 'Drunken Sailor (chant de marins)',
+    composer: 'Traditionnel (shanty anglo-irlandais)',
+    genre: 'folk',
+    level: 2,
+    tempo: 104,
+    timeSig: [4, 4],
+    keyFifths: 0,
+    description:
+      'Un chant de marins en mode de Ré dorien (Ré mineur avec un Si naturel). Les notes répétées « noire – deux croches » doivent rester légères ; la main gauche alterne les quintes Ré-La et Do-Sol.',
+    tags: ['mode dorien', 'chant de marins', 'notes répétées'],
+    tracks: {
+      R: 'A4:1:5 A4:0.5:5 A4:0.5:5 A4:1:5 A4:0.5:5 A4:0.5:5 | A4:1:5 D4:1:1 F4:1:3 A4:1:5 | G4:1:4 G4:0.5:4 G4:0.5:4 G4:1:4 G4:0.5:4 G4:0.5:4 | G4:1:5 C4:1:1 E4:1:3 G4:1:5 | A4:1:2 A4:0.5:2 A4:0.5:2 A4:1:2 A4:0.5:2 A4:0.5:2 | A4:1:2 B4:1:3 C5:1:4 D5:1:5 | C5:1:4 A4:1:2 G4:1:1 E4:1:3 | D4:2:2 D4:2:2',
+      L: 'D3+A3:4:5+1 | D3+A3:4:5+1 | C3+G3:4:5+1 | C3+G3:4:5+1 | D3+A3:4:5+1 | D3+A3:4:5+1 | C3+G3:4:5+1 | D3+A3:4:5+1',
+    },
+  },
+  {
+    id: 'korobeiniki',
+    title: 'Korobeïniki (Les colporteurs)',
+    composer: 'Traditionnel russe',
+    genre: 'folk',
+    level: 3,
+    tempo: 120,
+    timeSig: [4, 4],
+    keyFifths: 0,
+    keyMode: 'minor',
+    description:
+      'Une chanson populaire russe du XIXe siècle, en La mineur, devenue célèbre dans le monde entier. Rythme « noire pointée – croche » et croches bien égales ; la main gauche marque la basse en blanches.',
+    tags: ['russe', 'mineur', 'rythme pointé'],
+    tracks: {
+      R: 'E5:1 B4:0.5 C5:0.5 D5:1 C5:0.5 B4:0.5 | A4:1 A4:0.5 C5:0.5 E5:1 D5:0.5 C5:0.5 | B4:1.5 C5:0.5 D5:1 E5:1 | C5:1 A4:1 A4:2 | D5:1.5 F5:0.5 A5:1 G5:0.5 F5:0.5 | E5:1.5 C5:0.5 E5:1 D5:0.5 C5:0.5 | B4:1 B4:0.5 C5:0.5 D5:1 E5:1 | C5:1 A4:1 A4:2',
+      L: 'E2:2 B2:2 | A2:2 E3:2 | E2:2 B2:2 | A2:2 E3:2 | D3:2 A3:2 | C3:2 G3:2 | E2:2 B2:2 | A2+E3:4',
+    },
+  },
+  {
+    id: 'nous-vous-souhaitons',
+    title: 'Nous vous souhaitons un joyeux Noël',
+    composer: 'Traditionnel anglais (« We Wish You a Merry Christmas »)',
+    genre: 'noel',
+    level: 2,
+    tempo: 120,
+    timeSig: [3, 4],
+    keyFifths: 1,
+    pickupBeats: 1,
+    description:
+      'Une valse de Noël en Sol majeur qui commence par une levée. Chaque phrase monte d’un cran (Sol, puis La, puis Si) : la main se déplace d’une touche à chaque fois, préparez-la pendant les noires.',
+    tags: ['Noël', '3/4', 'levée', 'séquence'],
+    tracks: {
+      R: 'r:2 D4:1:1 | G4:1:4 G4:0.5:4 A4:0.5:5 G4:0.5:4 F#4:0.5:3 | E4:1:2 E4:1:2 E4:1:2 | A4:1:4 A4:0.5:4 B4:0.5:5 A4:0.5:4 G4:0.5:3 | F#4:1:2 D4:1:1 D4:1:1 | B4:1:3 B4:0.5:3 C5:0.5:4 B4:0.5:3 A4:0.5:2 | G4:1:1 E4:1:3 D4:0.5:2 D4:0.5:2 | E4:1:3 A4:1:5 F#4:1:4 | G4:2:5 r:1',
+      L: 'r:3 | G2+D3:3:5+1 | C3+G3:3:5+1 | A2+E3:3:5+1 | D3+A3:3:5+1 | B2+F#3:3:5+1 | E3+B3:3:5+1 | C3+G3:1:5+1 D3+A3:2:5+1 | G2+D3:2:5+1 r:1',
+    },
+  },
+  {
+    id: 'bon-roi-venceslas',
+    title: 'Le bon roi Venceslas (Good King Wenceslas)',
+    composer: 'Traditionnel (air « Tempus adest floridum », Piae Cantiones, 1582)',
+    genre: 'noel',
+    level: 2,
+    tempo: 96,
+    timeSig: [4, 4],
+    keyFifths: 1,
+    description:
+      'Un chant de Noël anglais sur un air médiéval, tout en noires et blanches. Deux positions : Ré-Mi-Fa♯-Sol-La (pouce sur Ré) et Sol-La-Si-Do-Ré (pouce sur Sol) ; changez de position pendant les blanches.',
+    tags: ['Noël', 'changement de position', 'Sol majeur'],
+    tracks: {
+      R: 'G4:1:4 G4:1:4 G4:1:4 A4:1:5 | G4:1:4 G4:1:4 D4:2:1 | E4:1:2 D4:1:1 E4:1:2 F#4:1:3 | G4:2:4 G4:2:4 | G4:1:4 G4:1:4 G4:1:4 A4:1:5 | G4:1:4 G4:1:4 D4:2:1 | E4:1:2 D4:1:1 E4:1:2 F#4:1:3 | G4:2:4 G4:2:4 | D5:1:5 C5:1:4 B4:1:3 A4:1:2 | B4:1:3 A4:1:2 G4:2:1 | E4:1:2 D4:1:1 E4:1:2 F#4:1:3 | G4:2:4 G4:2:4 | D4:1:1 D4:1:1 E4:1:2 F#4:1:3 | G4:1:4 G4:1:4 A4:2:5 | D5:1:5 C5:1:4 B4:1:3 A4:1:2 | G4:2:1 C5:2:4 | G4:4:1',
+      L: 'G2:4:5 | G2:2:5 B2:2:3 | C3:2:2 D3:2:1 | G2:4:5 | G2:4:5 | G2:2:5 B2:2:3 | C3:2:2 D3:2:1 | G2:4:5 | G2:2:5 D3:2:1 | G2:4:5 | C3:2:2 D3:2:1 | G2:4:5 | D3:4:1 | G2:2:5 D3:2:1 | G2:2:5 D3:2:1 | G2:2:5 C3:2:2 | G2:4:5',
+    },
+  },
+  {
+    id: 'anges-campagnes',
+    title: 'Les anges dans nos campagnes',
+    composer: 'Noël traditionnel français',
+    genre: 'noel',
+    level: 3,
+    tempo: 92,
+    timeSig: [4, 4],
+    keyFifths: -1,
+    description:
+      'Le célèbre « Gloria » en Fa majeur : un long mélisme de croches qui descend en séquence, mesure après mesure. Travaillez le refrain seul, en écoutant que chaque groupe de quatre croches reste égal.',
+    tags: ['Noël', 'Fa majeur', 'séquence', 'croches'],
+    tracks: {
+      R: rep('A4:1 A4:1 A4:1 C5:1 | C5:1.5 Bb4:0.5 A4:2 | A4:1 G4:1 A4:1 C5:1 | A4:1.5 G4:0.5 F4:2', 2) +
+        ' | ' + rep('C5:2 D5:0.5 C5:0.5 Bb4:0.5 A4:0.5 | Bb4:2 C5:0.5 Bb4:0.5 A4:0.5 G4:0.5 | A4:2 Bb4:0.5 A4:0.5 G4:0.5 F4:0.5 | G4:1.5 C4:0.5 C4:2 | F4:1 G4:1 A4:1 Bb4:1 | A4:2 G4:2', 2) +
+        ' | F4:4',
+      L: rep('F2+C3:4 | F2+C3:4 | F2+C3:4 | F2+C3:1 C3+G3:1 F2+C3:2', 2) +
+        ' | ' + rep('F2+C3:4 | Bb2+F3:4 | F2+C3:4 | C3+G3:4 | F2+C3:3 Bb2+F3:1 | F2+C3:2 C3+G3:2', 2) +
+        ' | F2+C3:4',
+    },
+  },
+  {
+    id: 'roi-montagne',
+    title: 'Dans l’antre du roi de la montagne (thème)',
+    composer: 'Edvard Grieg',
+    genre: 'classique',
+    level: 3,
+    tempo: 100,
+    timeSig: [4, 4],
+    keyFifths: 0,
+    keyMode: 'minor',
+    description:
+      'Le thème de « Peer Gynt » (1875), transposé en La mineur. Croches détachées et mystérieuses, main gauche en quintes piquées. Grieg accélère jusqu’à la frénésie : à vous de pousser le tempo petit à petit !',
+    tags: ['Grieg', 'romantique', 'staccato', 'mineur'],
+    tracks: {
+      R: rep('A4:0.5 B4:0.5 C5:0.5 D5:0.5 E5:0.5 C5:0.5 E5:1 | D#5:0.5 B4:0.5 D#5:1 D5:0.5 Bb4:0.5 D5:1 | A4:0.5 B4:0.5 C5:0.5 D5:0.5 E5:0.5 C5:0.5 E5:0.5 A5:0.5 | G5:0.5 E5:0.5 C5:0.5 E5:0.5 G5:2', 2) + ' | A4:4',
+      L: rep(`${rep('A2+E3:1', 4).replaceAll(' | ', ' ')} | ${rep('A2+E3:1', 4).replaceAll(' | ', ' ')} | ${rep('A2+E3:1', 4).replaceAll(' | ', ' ')} | ${rep('C3+G3:1', 4).replaceAll(' | ', ' ')}`, 2) + ' | A2+E3:4',
+    },
+  },
+  {
+    id: 'gymnopedie-1',
+    title: 'Gymnopédie n°1 (début)',
+    composer: 'Erik Satie',
+    genre: 'classique',
+    level: 4,
+    tempo: 66,
+    timeSig: [3, 4],
+    keyFifths: 2,
+    description:
+      '« Lent et douloureux » (1888). La main gauche se balance entre une basse grave et un accord de septième majeure : un vrai saut à préparer sans regarder. Pédale à chaque mesure, mélodie très liée.',
+    tags: ['Satie', 'impressionnisme', 'sauts', 'pédale', '3/4'],
+    tracks: {
+      R: 'r:3 | r:3 | r:3 | r:3 | r:1 F#5:1 A5:1 | G5:1 F#5:1 C#5:1 | B4:1 C#5:1 D5:1 | A4:3 | F#4:6',
+      L: rep('G2:1 B3+D4+F#4:2 | D2:1 A3+C#4+F#4:2', 4) + ' | G2:1 B3+D4:2 | D2:1 A3+C#4:2',
+    },
+  },
+  {
+    id: 'gamme-la',
+    title: 'Gamme de La majeur (2 octaves)',
+    composer: 'Exercice',
+    genre: 'technique',
+    level: 3,
+    tempo: 60,
+    timeSig: [4, 4],
+    keyFifths: 3,
+    description:
+      'Trois dièses : Fa♯, Do♯ et Sol♯. Doigté identique à Do majeur (main droite 1-2-3 / 1-2-3-4, main gauche 5-4-3-2-1 / 3-2-1) : le pouce reste toujours sur une touche blanche.',
+    tags: ['gamme', 'La majeur', 'dièses'],
+    tracks: { R: scaleTrack('A3', { F: '#', C: '#', G: '#' }, RH_SCALE), L: scaleTrack('A2', { F: '#', C: '#', G: '#' }, LH_SCALE) },
+  },
+  {
+    id: 'gamme-si-bemol',
+    title: 'Gamme de Si♭ majeur (2 octaves)',
+    composer: 'Exercice',
+    genre: 'technique',
+    level: 3,
+    tempo: 60,
+    timeSig: [4, 4],
+    keyFifths: -2,
+    description:
+      'Le doigté des gammes qui commencent sur une touche noire : le pouce ne joue que les touches blanches (Do et Fa). Main droite 4 sur Si♭, puis 1-2-3 / 1-2-3-4 ; main gauche 3-2-1-4-3-2-1-3.',
+    tags: ['gamme', 'Si♭ majeur', 'bémols', 'passage du pouce'],
+    tracks: { R: scaleTrack('B3', { B: 'b', E: 'b' }, RH_SCALE_BB), L: scaleTrack('B2', { B: 'b', E: 'b' }, LH_SCALE_BB) },
   },
 ];
 

@@ -1,10 +1,10 @@
 {
   "label": "after",
-  "date": "2026-11-07T15:24:50.975Z",
+  "date": "2026-11-07T15:28:33.619Z",
   "startup": {
-    "fmp": 9288,
+    "fmp": 9269,
     "startModules": 49,
-    "startKB": 565.6,
+    "startKB": 580.7,
     "startList": [
       "/js/app.js",
       "/js/views/index.js",
@@ -58,16 +58,16 @@
     ],
     "routes": {
       "entraîneur": {
-        "modules": 9,
-        "kb": 211.7
+        "modules": 8,
+        "kb": 199.3
       },
       "accords": {
         "modules": 2,
         "kb": 52.2
       },
       "importer": {
-        "modules": 6,
-        "kb": 124.7
+        "modules": 7,
+        "kb": 137.2
       },
       "jeux": {
         "modules": 0,
@@ -79,30 +79,30 @@
       }
     },
     "fmpRuns": [
-      9307,
-      9252,
-      9288
+      9299,
+      9269,
+      9242
     ]
   },
   "mic": {
-    "yinMs": 2.2949999999984483,
-    "silentMs": 0.0225,
-    "mainMs": 0.1303999999947846,
-    "frames": 125,
+    "yinMs": 2.2520000000018627,
+    "silentMs": 0.026000000000931323,
+    "mainMs": 0.16209677419429946,
+    "frames": 124,
     "mode": "worklet",
-    "bytesPerFrame": -1143
+    "bytesPerFrame": 1655
   },
   "trainer": {
     "song": "cinq-doigts-do",
     "fps": 60,
-    "worstFrameMs": 17,
+    "worstFrameMs": 33,
     "longFrames": 0,
-    "scriptMsPerFrame": 0.83,
-    "styleLayoutMsPerFrame": 0.49
+    "scriptMsPerFrame": 0.73,
+    "styleLayoutMsPerFrame": 0.41
   },
   "leaks": {
     "heapGrowthKB": 401,
-    "nodesGrowth": -1,
+    "nodesGrowth": 0,
     "listenersGrowth": 0,
     "winDocListenersGrowth": 0,
     "rafPerSecOnHome": 0

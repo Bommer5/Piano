@@ -109,17 +109,29 @@ async function micCost() {
     mic.handleAnalysis = orig;
     return { yinMs: pitched.reduce((a, b) => a + b, 0) / pitched.length, silentMs: bench(quiet, 400), mainMs: n ? tot / n : null, frames: n, mode: mic.mode };
   });
-  // allocations : tas avant/après 500 analyses
-  const alloc = await page.evaluate(async () => {
-    const { detectPitchAdaptive, synthTone } = await import('./js/core/pitch.js');
-    const b = synthTone(98, 48000, 4096, { harmonics: 5 });
-    const m0 = performance.memory?.usedJSHeapSize || 0;
-    for (let i = 0; i < 500; i++) detectPitchAdaptive(b, 48000, { minRms: 0.004 });
-    const m1 = performance.memory?.usedJSHeapSize || 0;
-    return Math.round((m1 - m0) / 500);
-  });
   await context.close();
-  return { ...res, bytesPerFrame: alloc };
+  return { ...res, bytesPerFrame: await allocPerFrame() };
+}
+
+/** Octets alloués par trame d'analyse (Node, sans ramasse-miettes pendant la mesure : 100 trames ≪ new space). */
+async function allocPerFrame() {
+  const v8 = await import('node:v8');
+  const vm = await import('node:vm');
+  v8.setFlagsFromString('--expose-gc');
+  const gc = vm.runInNewContext('gc');
+  const { detectPitchAdaptive, synthTone } = await import('../../js/core/pitch.js');
+  const bufs = [55, 98, 220, 440, 880].map((f) => synthTone(f, 48000, 4096, { harmonics: 5 }));
+  for (let i = 0; i < 200; i++) detectPitchAdaptive(bufs[i % 5], 48000, { minRms: 0.004 });
+  // tas JS + tampons des tableaux typés (alloués hors du tas V8)
+  const mem = () => { const u = process.memoryUsage(); return u.heapUsed + u.arrayBuffers; };
+  const samples = [];
+  for (let k = 0; k < 5; k++) {
+    gc();
+    const m0 = mem();
+    for (let i = 0; i < 100; i++) detectPitchAdaptive(bufs[i % 5], 48000, { minRms: 0.004 });
+    samples.push((mem() - m0) / 100);
+  }
+  return Math.round(median(samples));
 }
 
 // ---------- 3. FPS de l'entraîneur en mode Écoute ----------
@@ -223,7 +235,7 @@ const row = (r) => r && [
   ['Analyse micro YIN, trame jouée (ms, CPU ×4)', +r.mic.yinMs?.toFixed(3)],
   ['Analyse micro, trame sous le seuil (ms)', +r.mic.silentMs?.toFixed(4)],
   ['Fil principal par trame micro (ms)', r.mic.mainMs != null ? +r.mic.mainMs.toFixed(3) : 'n/a'],
-  ['Octets alloués par trame micro', r.mic.bytesPerFrame],
+  ['Octets alloués par trame micro (Node)', r.mic.bytesPerFrame],
   ['Entraîneur, FPS (Écoute, 20 s)', r.trainer.fps],
   ['Entraîneur, script par trame (ms)', r.trainer.scriptMsPerFrame],
   ['Entraîneur, style+layout par trame (ms)', r.trainer.styleLayoutMsPerFrame],

@@ -40,6 +40,22 @@ function diffAt(buf, tau, W) {
  * @returns {{freq:number, clarity:number, rms:number, tau:number} | null}
  */
 let cmndScratch = new Float64Array(2050);
+// Somme courante de d(tau) : gardée dans un tableau typé plutôt que dans une variable capturée par une
+// fermeture (une variable flottante capturée est réallouée sur le tas à chaque mise à jour : ~4 Ko par trame).
+const yinRunning = new Float64Array(1);
+/** Calcule cmnd[computed+1 … min(tau, maxTau)] ; renvoie le nouvel indice calculé. */
+function ensureCmnd(buf, cmnd, computed, tau, maxTau, W) {
+  if (computed >= tau || computed >= maxTau) return computed;
+  const end = tau < maxTau ? tau : maxTau;
+  let running = yinRunning[0];
+  for (let t = computed + 1; t <= end; t++) {
+    const d = diffAt(buf, t, W);
+    running += d;
+    cmnd[t] = running > 0 ? (d * t) / running : 1;
+  }
+  yinRunning[0] = running;
+  return end;
+}
 export function detectPitch(buf, sampleRate, opts = {}) {
   const { threshold = 0.15, minFreq = 27.5, maxFreq = 4200, minRms = 0.01 } = opts;
   const level = rms(buf);
@@ -56,25 +72,17 @@ export function detectPitch(buf, sampleRate, opts = {}) {
   if (cmndScratch.length < maxTau + 2) cmndScratch = new Float64Array(maxTau + 2);
   const cmnd = cmndScratch;
   cmnd[0] = 1;
+  yinRunning[0] = 0;
   let computed = 0;
-  let running = 0;
-  const ensure = (tau) => {
-    while (computed < tau && computed < maxTau) {
-      const t = ++computed;
-      const d = diffAt(buf, t, W);
-      running += d;
-      cmnd[t] = running > 0 ? (d * t) / running : 1;
-    }
-  };
 
   let tauEst = -1;
   for (let tau = minTau; tau <= maxTau; tau++) {
-    ensure(tau);
+    computed = ensureCmnd(buf, cmnd, computed, tau, maxTau, W);
     if (cmnd[tau] < threshold) {
-      ensure(tau + 1);
+      computed = ensureCmnd(buf, cmnd, computed, tau + 1, maxTau, W);
       while (tau + 1 <= maxTau && cmnd[tau + 1] < cmnd[tau]) {
         tau++;
-        ensure(tau + 1);
+        computed = ensureCmnd(buf, cmnd, computed, tau + 1, maxTau, W);
       }
       tauEst = tau;
       break;
@@ -87,7 +95,7 @@ export function detectPitch(buf, sampleRate, opts = {}) {
     if (cmnd[best] > 0.35) return null;
     tauEst = best;
   }
-  ensure(tauEst + 1);
+  computed = ensureCmnd(buf, cmnd, computed, tauEst + 1, maxTau, W);
 
   // Interpolation parabolique pour la précision sub-échantillon
   let betterTau = tauEst;

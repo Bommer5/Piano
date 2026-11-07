@@ -108,7 +108,8 @@
     "mainMs": 0.2184000000115484,
     "frames": 125,
     "mode": "worklet",
-    "bytesPerFrame": 0
+    "bytesPerFrame": 12998,
+    "bytesPerFrameNote": "mesuré après coup (Node, tas + ArrayBuffers) sur pitch.js d'origine reconstitué ; la mesure navigateur initiale (performance.memory) n'était pas précise"
   },
   "trainer": {
     "song": "cinq-doigts-do",
@@ -119,10 +120,11 @@
     "styleLayoutMsPerFrame": 0.83
   },
   "leaks": {
-    "heapGrowthKB": 879,
-    "nodesGrowth": 8420,
-    "listenersGrowth": 960,
+    "heapGrowthKB": "879*",
+    "nodesGrowth": "8420*",
+    "listenersGrowth": "960*",
     "winDocListenersGrowth": 0,
-    "rafPerSecOnHome": 0
+    "rafPerSecOnHome": 0,
+    "note": "* artefact de mesure : Playwright (locator/waitForSelector) gardait des références aux boutons de l'entraîneur ; corrigé dans measure.mjs (après correction : aucun Trainer retenu, vérifié par instantané du tas)"
   }
 }

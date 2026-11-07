@@ -360,6 +360,7 @@ export const COURSES = [
         blocks: [
           text('<p>Commençons par des mélodies jouées par une seule main, sans déplacer la position. L’objectif : un son régulier et des doigts qui ne s’envolent pas.</p>'),
           practice('cinq-doigts-do', 'R', 80, 'Cinq doigts en Do (main droite)'),
+          practice('petits-pains-chauds', 'R', 80, 'Petits pains chauds : trois notes'),
           practice('main-gauche-do', 'L', 80, 'La main gauche se promène'),
           tip('Gardez l’ongle du doigt qui joue bien au-dessus de la touche, et les autres doigts posés en surface.'),
         ],
@@ -519,6 +520,7 @@ export const COURSES = [
           practice('clair-de-la-lune', 'R', 80, 'Au clair de la lune : main droite'),
           tip('Au milieu de la chanson (« Ma chandelle est morte »), la main droite se déplace : pouce sur le Sol grave. Préparez ce déplacement pendant la ronde qui précède.'),
           practice('clair-de-la-lune', 'both', 70, 'Au clair de la lune : mains ensemble'),
+          practice('marie-agneau', 'both', 70, 'Marie avait un petit agneau : à chanter aussi'),
         ],
       },
       {
@@ -608,6 +610,7 @@ export const COURSES = [
           exercise('Sentir le 6/8', { R: 'C4:1:1 D4:0.5:2 E4:1:3 F4:0.5:4 | G4:1.5:5 G4:1.5:5 | G4:0.75:5 F4:0.25:4 E4:0.5:3 D4:1.5:2 | C4:3:1' }, { tempo: 60, timeSig: [6, 8], hands: 'R' }),
           practice('douce-nuit', 'R', 80, 'Douce nuit : main droite'),
           practice('douce-nuit', 'both', 70, 'Douce nuit : mains ensemble'),
+          practice('rame-doucement', 'R', 80, 'Rame, rame doucement : un autre 6/8'),
           quiz('Combien de « grands temps » dans une mesure à 6/8 ?', ['6', '3', '2', '8'], 2, 'Les 6 croches sont groupées par 3 : deux temps de noire pointée.'),
         ],
       },
@@ -657,7 +660,7 @@ export const COURSES = [
         duration: 10,
         level: 2,
         blocks: [
-          text('<p>Le rythme <strong>noire pointée + croche</strong> donne leur élan aux chants écossais. La noire pointée dure 1 temps ½, la croche complète le 2e temps. Comptez « 1 — et 2 ».</p>'),
+          text('<p>Le rythme <strong>noire pointée + croche</strong> donne leur élan aux chants écossais. La noire pointée dure 1 temps ½ : elle occupe le 1er temps et la première moitié du 2e ; la croche tombe sur le « et » du 2e temps. Comptez « 1 – 2 – et ».</p>'),
           exercise('Noire pointée – croche', { R: 'C4:1.5:1 C4:0.5:1 E4:1:3 G4:1:5 | F4:1.5:4 E4:0.5:3 D4:2:2 | E4:1.5:3 D4:0.5:2 C4:2:1' }, { tempo: 80, hands: 'R' }),
           practice('au-revoir', 'R', 80, 'Main droite'),
           practice('au-revoir', 'both', 70, 'Mains ensemble'),
@@ -669,10 +672,11 @@ export const COURSES = [
         duration: 12,
         level: 3,
         blocks: [
-          text('<p>Beaucoup de mélodies anciennes n’utilisent pas exactement nos gammes majeures et mineures, mais des <strong>modes</strong>. Greensleeves hésite entre le Sol naturel (couleur ancienne, presque dorienne) et le Sol♯ (sensible moderne, qui « tire » vers le La aux cadences).</p>'),
-          exercise('Sol naturel ou Sol dièse ?', { R: 'A4:1:2 G4:1:1 A4:2:2 | A4:1:2 G#4:1:1 A4:2:2' }, { tempo: 60, hands: 'R' }),
+          text('<p>Beaucoup de mélodies anciennes n’utilisent pas exactement nos gammes majeures et mineures, mais des <strong>modes</strong>. Greensleeves hésite entre le Sol naturel (couleur ancienne, modale) et le Sol♯ (sensible moderne, qui « tire » vers le La aux cadences).</p>'),
+          exercise('Sol naturel ou Sol dièse ?', { R: 'A4:1:3 G4:1:2 A4:2:3 | A4:1:3 G#4:1:2 A4:2:3' }, { tempo: 60, hands: 'R' }),
           practice('greensleeves', 'R', 70, 'Greensleeves : main droite'),
           practice('greensleeves', 'both', 60, 'Greensleeves : mains ensemble'),
+          practice('drunken-sailor', 'R', 70, 'Drunken Sailor : le mode de Ré dorien'),
           quiz('Pourquoi le Sol♯ apparaît-il aux fins de phrases ?', ['Pour moderniser le morceau', 'C’est la sensible : elle attire l’oreille vers la tonique La', 'Pour faciliter le doigté', 'C’est une faute de copie'], 1, 'Un demi-ton sous la tonique, la sensible crée une tension qui se résout sur La : c’est la cadence du mineur harmonique.'),
         ],
       },
@@ -779,7 +783,7 @@ export const COURSES = [
         level: 2,
         blocks: [
           text('<p>En jazz, deux croches écrites ne sont pas jouées égales : la première est plus longue (2/3 du temps), la seconde plus courte (1/3). On les appelle <strong>croches swing</strong> ou ternaires. Dites « <strong>dou</strong>-ba <strong>dou</strong>-ba » : vous swinguez déjà.</p>'),
-          exercise('Croches swing', { R: 'C4:2/3:1 D4:1/3:2 E4:2/3:3 F4:1/3:4 G4:2/3:5 A4:1/3:5 G4:2/3:4 E4:1/3:2 | C4:2:1 r:2' }, { tempo: 90, hands: 'R' }),
+          exercise('Croches swing', { R: 'C4:2/3:1 D4:1/3:2 E4:2/3:3 F4:1/3:4 G4:2/3:5 F4:1/3:4 E4:2/3:3 D4:1/3:2 | C4:2:1 r:2' }, { tempo: 90, hands: 'R' }),
           tip('Le swing, c’est aussi l’accent : appuyez légèrement les contretemps (la 2e croche de chaque paire) et les temps 2 et 4.'),
           quiz('Dans des croches swing, la première croche dure…', ['1/2 temps', '2/3 de temps', '1/3 de temps', '3/4 de temps'], 1, 'Le temps est divisé en trois : la 1re croche prend deux tiers, la 2e un tiers.'),
         ],
@@ -811,11 +815,11 @@ export const COURSES = [
         level: 3,
         blocks: [
           text(
-            '<p>L’enchaînement <strong>II-V-I</strong> (Rém7 – Sol7 – Domaj7 en Do) est partout dans les standards de jazz. Pour le jouer, les pianistes utilisent des <strong>shell voicings</strong> (« accords coquilles ») : seulement la fondamentale, la tierce et la septième. La quinte, peu utile, est omise.</p><p>À la main gauche : fondamentale + septième, ou fondamentale + tierce, en alternance pour bouger le moins possible.</p>',
+            '<p>L’enchaînement <strong>II-V-I</strong> (Rém7 – Sol7 – Domaj7 en Do) est partout dans les standards de jazz. Pour le jouer, les pianistes utilisent des <strong>shell voicings</strong> (« accords coquilles ») : seulement la fondamentale, la tierce et la septième. La quinte, peu utile, est omise.</p><p>À la main gauche : fondamentale + septième, ou fondamentale + tierce, en alternance pour bouger le moins possible. Dans l’exercice : Ré-Fa (+ Do à droite), Sol-Fa (+ Si), Do-Mi (+ Si) — le Fa descend d’un demi-ton vers le Mi.</p>',
           ),
           exercise(
             'II-V-I en shell voicings (main gauche)',
-            { R: 'F4:4 | F4:2 E4:2 | E4:4', L: 'D3+C4:4 | G2+F3:4 | C3+B3:4' },
+            { R: 'C5:4 | B4:4 | B4:4', L: 'D3+F3:4 | G2+F3:4 | C3+E3:4' },
             { tempo: 66, hands: 'both' },
           ),
           practice('deux-cinq-un', 'both', 80, 'II-V-I dans trois tonalités'),
@@ -993,6 +997,7 @@ export const COURSES = [
           practice('gamme-sol', 'both', 60, 'Sol majeur : mains ensemble'),
           practice('gamme-re', 'both', 60, 'Ré majeur : mains ensemble'),
           practice('gamme-fa', 'R', 70, 'Fa majeur : le doigté spécial de la main droite'),
+          practice('gamme-si-bemol', 'R', 70, 'Si♭ majeur : le pouce seulement sur les touches blanches'),
           text('<p>La gamme <strong>mineure harmonique</strong> élève le 7e degré d’un demi-ton (Sol♯ en La mineur) : on obtient une seconde augmentée Fa–Sol♯, très expressive.</p>'),
           practice('gamme-la-mineur', 'both', 60, 'La mineur harmonique'),
           practice('gamme-mi-mineur', 'both', 60, 'Mi mineur harmonique'),

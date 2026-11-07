@@ -18,7 +18,6 @@ import { StaffView, measuresPerPage } from './staff.js';
 import { store } from '../core/storage.js';
 import * as dom from './dom.js';
 import { showReport, showErrorReview, confetti } from './report.js';
-import { exportMidi } from '../parsers/midi.js';
 
 const { h, toast, modal, escapeHtml, download } = dom;
 
@@ -1448,13 +1447,13 @@ export class Trainer {
   }
 
   exportTake() {
-    try {
-      const data = exportMidi(takeToSong(this.take, this.song));
+    // l'export MIDI (parsers/midi.js) n'est chargé qu'au premier clic
+    const take = this.take, cur = this.song;
+    import('../parsers/midi.js').then(({ exportMidi }) => {
+      const data = exportMidi(takeToSong(take, cur));
       const name = (this.baseSong.title || 'morceau').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '');
       download(`${name}-ma-prise.mid`, data, 'audio/midi');
-    } catch (e) {
-      toast('Export impossible : ' + (e.message || e));
-    }
+    }).catch((e) => toast('Export impossible : ' + (e.message || e)));
   }
 
   // ---------- relecture ----------
