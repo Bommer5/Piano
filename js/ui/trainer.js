@@ -5,6 +5,7 @@ import { PracticeEngine } from '../core/practice.js';
 import { measureOf, transposeSong } from '../core/song.js';
 import { measureNumber } from '../core/notation.js';
 import { matchChord } from '../core/spectrum.js';
+import { resolveMicNote } from '../core/onset.js';
 import { noteLabel, FINGER_NAMES, pitchClass } from '../core/notes.js';
 import { createTake, takeNoteOn, takeNoteOff, takePedal, addAnchor, closeTake, judgeOf, takeOverlay, takeBeatAt, takeTimeAt, takeToSong, saveTake, analyzeTake } from '../core/take.js';
 import { ScoreFollower } from '../core/follower.js';
@@ -577,12 +578,40 @@ export class Trainer {
     }
     if (e.type === 'onset') {
       if (this.opts.mode === 'listen') return;
+      // Écho : le micro réentend une note que l'app vient de jouer (touche de l'écran, accompagnement) → ignorée
+      if (synth.isEcho(e.midi, e.detectedAt ?? e.t)) return;
       if (this.opts.mode === 'concert') return this.concertInput(e.midi, 'mic', 0.8, e.t);
-      this.recordOn(e.midi, 'mic', 0.8, e.t);
-      this.evaluate(e.midi, 'mic', { perfT: e.t });
+      let midi = e.midi;
+      // Parent harmonique d'une note attendue (octave, douzième, sous-harmonique d'un mélange de notes) :
+      // on vérifie directement dans le spectre que la note attendue sonne bien.
+      const r = resolveMicNote(midi, this.micExpected());
+      if (r.confusable) {
+        const mag = mic.spectrum();
+        if (!mag || !matchChord(mag, mic.sampleRate, [r.midi], { a4: this.settings.a4 }).ok) return;
+        midi = r.midi;
+      }
+      this.recordOn(midi, 'mic', 0.8, e.t);
+      this.evaluate(midi, 'mic', { perfT: e.t });
       // le micro ne donne pas de relâchement : on ferme la note de la prise après une durée nominale
-      this.later(() => takeNoteOff(this.take, e.midi, this.takeTime('mic')), 250);
+      this.later(() => takeNoteOff(this.take, midi, this.takeTime('mic')), 250);
     }
+  }
+
+  /** Notes attendues « maintenant » (pour lever les ambiguïtés du micro). */
+  micExpected() {
+    if (!this.engine) return [];
+    if (this.waitLike) {
+      const ev = this.engine.current;
+      return ev ? ev.midis.filter((m) => !this.engine.satisfied.has(m)) : [];
+    }
+    const out = [];
+    const now = this.songTime(0);
+    for (let i = this.engine.tIdx ?? 0; i < this.engine.events.length; i++) {
+      const ev = this.engine.events[i];
+      if (ev.time - now > ev.win.ok) break;
+      if (Math.abs(ev.time - now) <= ev.win.ok) for (const n of ev.notes) if (!this.engine.judged.has(n.id)) out.push(n.midi);
+    }
+    return out;
   }
 
   showDetected(e) {
@@ -624,6 +653,7 @@ export class Trainer {
     if (!mag) return;
     const res = matchChord(mag, mic.sampleRate, expected, { a4: this.settings.a4 });
     for (const m of res.present) {
+      if (synth.isEcho(m, this.lastAttack)) continue;
       this.recordOn(m, 'mic-chord', 0.8, this.lastAttack);
       this.evaluate(m, 'mic-chord', { perfT: this.lastAttack });
     }

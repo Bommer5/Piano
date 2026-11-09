@@ -157,6 +157,8 @@ export class PianoKeyboard {
     };
     this.el.addEventListener('pointerup', up);
     this.el.addEventListener('pointercancel', up);
+    // Appui long sur mobile : pas de menu contextuel, pas de sélection, pas de glisser-déposer
+    for (const ev of ['contextmenu', 'selectstart', 'dragstart']) this.el.addEventListener(ev, (e) => e.preventDefault());
   }
 }
 

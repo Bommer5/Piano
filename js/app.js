@@ -56,6 +56,15 @@ window.addEventListener('hashchange', route);
 route();
 // Débloque l'audio au premier geste (politique des navigateurs)
 window.addEventListener('pointerdown', () => synth.audioContext(), { once: true });
+
+// Appui long (Android/Chrome) : pas de menu contextuel sur les zones de jeu et les boutons.
+// On le laisse sur les liens de navigation hors zone de jeu, les champs de saisie et le texte des leçons.
+const NO_MENU = '.piano, .trainer, .stage, canvas, svg.staff, button, .btn, .seg, .tap-pad, .nav, .tabbar, [data-no-menu], .games, .game';
+window.addEventListener('contextmenu', (e) => {
+  const t = e.target;
+  if (!(t instanceof Element) || t.closest('input, textarea, [contenteditable]')) return;
+  if (t.closest(NO_MENU)) e.preventDefault();
+});
 window.addEventListener('keydown', () => synth.audioContext(), { once: true });
 
 // Mode hors-ligne (PWA) si disponible

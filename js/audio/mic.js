@@ -6,7 +6,7 @@
 import { audioContext } from './synth.js';
 import { detectPitchAdaptive } from '../core/pitch.js';
 import { freqToMidiFloat } from '../core/notes.js';
-import { OnsetDetector, micCaptureTime, profileThresholds, bandOf } from '../core/onset.js';
+import { OnsetDetector, TransientDetector, micCaptureTime, profileThresholds, bandOf } from '../core/onset.js';
 import { dbToMagnitude } from '../core/spectrum.js';
 import { store } from '../core/storage.js';
 
@@ -160,7 +160,22 @@ export class MicListener {
     this.analyser.getFloatTimeDomainData(this.full);
     const ac = audioContext();
     const res = detectPitchAdaptive(this.time, ac.sampleRate, { minRms: this.analysisMinRms, minFreq: 27.5, maxFreq: 4300 });
-    this.handleAnalysis({ ...res, audioTime: null });
+    // Détection des frappes aussi en mode repli : on donne au détecteur les échantillons arrivés depuis le dernier passage
+    const sr = ac.sampleRate;
+    if (!this._td || this._td.sr !== sr) {
+      this._td = new TransientDetector(sr);
+      this._tdTime = ac.currentTime;
+    }
+    const fresh = Math.min(this.full.length, Math.max(0, Math.round((ac.currentTime - this._tdTime) * sr)));
+    this._tdTime = ac.currentTime;
+    let strikeAge = null;
+    if (fresh > 0) {
+      const base = this._td.total;
+      this._td.push(this.full.subarray(this.full.length - fresh), (idx) => {
+        if (strikeAge == null) strikeAge = (base + fresh - idx) / sr;
+      });
+    }
+    this.handleAnalysis({ ...res, audioTime: null, transient: strikeAge != null, transientAge: strikeAge });
   }
 
   /** Convertit un résultat d'analyse en événements 'frame' / 'onset'. */
@@ -195,7 +210,13 @@ export class MicListener {
     const confidence = midi == null ? 0 : +(clarity * (0.4 + 0.6 * snr) * (0.5 + 0.5 * stab)).toFixed(3);
     this.confidence = confidence;
     const attackT = r.peakAge != null && r.audioTime != null ? t - r.peakAge * 1000 : t;
-    const { attack, onset, onsetT } = this.onset.push({ t, rms: r.rms, midi, clarity, minRms: th.minRms, minClarity: this.profile ? th.minClarity : undefined, attackT });
+    // frappe détectée par l'analyseur (choc du marteau) : indispensable pour les notes répétées
+    const frame = { t, rms: r.rms, midi, midiFloat, clarity, minRms: th.minRms, minClarity: this.profile ? th.minClarity : undefined, attackT };
+    if (r.transient !== undefined) {
+      frame.transient = !!r.transient;
+      if (r.transient) frame.transientT = t - (r.transientAge || 0) * 1000;
+    }
+    const { attack, onset, onsetT } = this.onset.push(frame);
     this.emit({ type: 'frame', t, rms: r.rms, freq, midi, midiFloat, cents, clarity, attack, confidence, band: midi != null ? bandOf(midi) : null, attackT: attack ? attackT : null, peak: r.peak ?? null });
     if (onset != null) this.emit({ type: 'onset', t: onsetT ?? t, midi: onset, detectedAt: t });
   }

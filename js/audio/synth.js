@@ -166,9 +166,33 @@ function stealOldest(now) {
  * @param {number} midi
  * @param {{when?:number, dur?:number, velocity?:number, instrument?:string, a4?:number}} opts when/dur en secondes (temps AudioContext)
  */
+// --- Écho : notes que l'APP vient de jouer (haut-parleur → micro) ---
+// Si le micro réentend une note produite par l'app (touche de l'écran, accompagnement, écoute), ce n'est pas
+// une note jouée par l'élève : sans ce garde-fou, une note répétée serait validée deux fois.
+const echoLog = []; // {midi, at (performance.now() du début du son)}
+function logEcho(midi, t0, ac) {
+  const at = performance.now() + (t0 - ac.currentTime) * 1000 + ((ac.outputLatency || 0) + (ac.baseLatency || 0)) * 1000;
+  echoLog.push({ midi, at });
+  if (echoLog.length > 96) echoLog.splice(0, echoLog.length - 96);
+}
+/**
+ * La note `midi` entendue au micro à l'instant `t` (performance.now()) est-elle l'écho d'une note de l'app ?
+ * Vrai si l'app a commencé la même note (ou une de ses octaves, que le micro confond) dans les `windowMs` précédentes.
+ */
+export function isEcho(midi, t = performance.now(), windowMs = 450) {
+  for (let i = echoLog.length - 1; i >= 0; i--) {
+    const e = echoLog[i];
+    if (t - e.at > windowMs + 200) break;
+    const d = Math.abs(midi - e.midi);
+    if (t - e.at >= -120 && t - e.at <= windowMs && (d === 0 || d === 12 || d === 19 || d === 24)) return true;
+  }
+  return false;
+}
+
 export function playNote(midi, { when = 0, dur = 1, velocity = 0.8, instrument = 'piano', a4 = 440 } = {}) {
   const ac = audioContext();
   const t0 = Math.max(ac.currentTime, when || ac.currentTime);
+  logEcho(midi, t0, ac);
   const end = t0 + Math.max(0.08, dur);
   const routing = midiOutput.routing();
   let midiSent = false;

@@ -587,3 +587,10 @@ dialog.modal h2 { margin-top: 0; }
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
 :root[data-reduce-motion] *, :root[data-reduce-motion] *::before, :root[data-reduce-motion] *::after { animation: none !important; transition: none !important; }
+
+/* Appui long sur mobile : ni menu « callout », ni sélection de texte, ni loupe sur les zones de jeu */
+.piano, .piano *, .trainer .stage, .trainer .controls, canvas, svg.staff, button, .btn, .seg, .tap-pad, [data-no-menu] {
+  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.piano, .piano .key { touch-action: none; }
+img, svg { -webkit-user-drag: none; }
