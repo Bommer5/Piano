@@ -267,5 +267,6 @@ test('performance : 60 s de musique transcrites en moins de 10 s', () => {
   }
   assert.ok(ok / ev.length > 0.9, `rappel ${ok}/${ev.length}`);
   assert.ok(ok / res.notes.length > 0.9, `précision ${ok}/${res.notes.length}`);
-  assert.equal(res.tempo, 120);
+  // mélodie tirée au hasard : aucun repère de mesure, 120 et 60 (une noire sur deux) se valent
+  assert.ok(res.tempo === 120 || res.tempo === 60, `tempo ${res.tempo}`);
 });

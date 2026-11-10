@@ -11,11 +11,20 @@ import { quantize, dedupe, suggestSplitPoint, splitHands, GRIDS, toRawSong } fro
 import { ctx, main, onCleanup, registerRoute, levelLabel, section, withDeps } from '../ui/context.js';
 
 // Modules propres à cette page : chargés à la première visite (allègent le démarrage).
-let importScoreFile, importScoreText, SUPPORTED_FORMATS, StaffView;
+let importScoreFile, importScoreText, SUPPORTED_FORMATS, StaffView, transcriptionToSong;
 async function loadDeps() {
-  const [m0, m1] = await Promise.all([import('../parsers/index.js'), import('../ui/staff.js')]);
+  const [m0, m1, m2] = await Promise.all([import('../parsers/index.js'), import('../ui/staff.js'), import('../core/transcribe.js')]);
   ({ importScoreFile, importScoreText, SUPPORTED_FORMATS } = m0);
   ({ StaffView } = m1);
+  transcriptionToSong = m2.toRawSong;
+}
+
+/** Résumé en une phrase de ce que l'import a compris (« 2 mains, 32 mesures, reprises dépliées… »). */
+export function importSummary(s, raw = {}) {
+  const parts = [`${s.notes.length} notes`, s.hands.R && s.hands.L ? '2 mains' : '1 main', `${s.measureCount} mesure${s.measureCount > 1 ? 's' : ''} à ${s.timeSig[0]}/${s.timeSig[1]}`];
+  for (const d of raw.importReport?.details || []) parts.push(d);
+  parts.push(s.autoFingering ? 'doigtés calculés automatiquement' : 'doigtés de la partition');
+  return parts.join(' · ');
 }
 
 // ---------- Import ----------
@@ -64,7 +73,7 @@ function viewImport() {
       try {
         const raw = await importScoreFile(file, { onProgress: (f) => (bar.style.width = Math.round(f * 100) + '%') });
         wait.remove();
-        showPreview(raw, file.name);
+        showPreview(raw, file.name, file);
       } catch (err) {
         wait.remove();
         showError(err, file.name);
@@ -76,10 +85,23 @@ function viewImport() {
     result.prepend(h('div', { class: 'card error' }, [h('b', {}, name ? `Impossible d’importer « ${name} »` : 'Import impossible'), h('p', {}, err.message || String(err))]));
   }
 
-  function showPreview(raw, name) {
+  function showPreview(raw, name, file) {
+    const id = 'imp-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const analysis = raw.transcribed ? raw.analysis : null; // résultat de l'analyse audio : permet de requantifier
+    const tune = { tempoScale: 1, grid: 0, timeSig: null, hands: 'both', octave: 0, shift: 0 };
+    let cur = raw; // morceau brut courant (refait à chaque réglage rapide)
     let s;
+    const build = () => {
+      if (analysis) {
+        const opts = { title: raw.title, composer: raw.composer, tempoScale: tune.tempoScale, hands: tune.hands, octave: tune.octave, shift: tune.shift };
+        if (tune.grid) opts.grid = tune.grid;
+        if (tune.timeSig) opts.timeSig = tune.timeSig;
+        cur = { ...transcriptionToSong(analysis, opts), source: raw.source };
+      }
+      return prepareSong({ ...cur, id });
+    };
     try {
-      s = prepareSong({ ...raw, id: 'imp-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) });
+      s = build();
     } catch (err) {
       return showError(err, name);
     }
@@ -91,27 +113,175 @@ function viewImport() {
     const level = h('select', { 'aria-label': 'Niveau' }, [1, 2, 3, 4, 5].map((l) => h('option', { value: l, selected: l === (s.level || estimateLevel(s)) }, levelLabel(l))));
     const splitPt = h('input', { type: 'number', min: 36, max: 84, value: suggestSplitPoint(s.notes), class: 'num', 'aria-label': 'Point de partage des mains (numéro MIDI, 60 = Do central)', oninput: () => (splitName.textContent = noteLabel(Number(splitPt.value) || 60, ctx.settings)) });
     const splitName = h('span', { class: 'small muted' }, noteLabel(Number(splitPt.value), ctx.settings));
-    const split = h('div', { class: 'row' }, [h('label', { class: 'check' }, [h('input', { type: 'checkbox', checked: !s.hands.L }), 'Répartir les mains à partir de']), splitPt, splitName]);
+    const split = h('div', { class: 'row' }, [h('label', { class: 'check' }, [h('input', { type: 'checkbox', checked: !s.hands.L && !analysis }), 'Répartir les mains à partir de']), splitPt, splitName]);
     const staffBox = h('div', { class: 'staff-box' });
+    const info = h('p', { class: 'import-summary' });
+    const pageLabel = h('span', { class: 'small muted', role: 'status' });
+    let page = 0;
+    const staff = new StaffView(staffBox);
+    const perPage = () => s.beatsPerMeasure * 4;
+    const pages = () => Math.max(1, Math.ceil(s.totalBeats / perPage() - 1e-6));
+    const prevBtn = h('button', { class: 'btn small', 'aria-label': 'Mesures précédentes', onclick: () => { page = Math.max(0, page - 1); draw(); } }, '◀');
+    const nextBtn = h('button', { class: 'btn small', 'aria-label': 'Mesures suivantes', onclick: () => { page = Math.min(pages() - 1, page + 1); draw(); } }, '▶');
+    function draw() {
+      page = Math.min(page, pages() - 1);
+      const from = page * perPage(), to = Math.min(s.totalBeats, from + perPage());
+      staff.render(s, from, to, { settings: ctx.settings, showFingers: true });
+      for (const n of s.notes) if (n.uncertain) staff.mark(n.id, 'uncertain');
+      const m0 = page * 4 + 1;
+      pageLabel.textContent = `Mesures ${m0} à ${Math.min(s.measureCount, m0 + 3)} sur ${s.measureCount}`;
+      prevBtn.disabled = page === 0;
+      nextBtn.disabled = page >= pages() - 1;
+    }
+
+    // --- transcription audio : confiance, écoute comparée, réglages rapides ---
+    const conf = h('div', { class: 'import-conf' });
+    const tuneState = h('span', { class: 'small muted', role: 'status' });
+    let player = null; // { stop() }
+    const stopPlayer = () => { if (player) player.stop(); player = null; origBtn.textContent = '▶ Écouter l’original'; transBtn.textContent = '▶ Écouter la transcription'; };
+    const audioUrl = analysis && file && typeof URL !== 'undefined' && URL.createObjectURL ? URL.createObjectURL(file) : null;
+    const audioEl = audioUrl ? new Audio(audioUrl) : null;
+    if (audioEl) audioEl.addEventListener('ended', () => stopPlayer());
+    // seconde de l'enregistrement qui correspond à un temps de la partition affichée
+    const secOfBeat = (beat) => {
+      const bt = analysis.beatTimes || [];
+      if (bt.length < 2) return 0;
+      const x = Math.max(0, (beat - tune.shift) / tune.tempoScale);
+      const i = Math.min(bt.length - 2, Math.floor(x));
+      return Math.max(0, bt[i] + (x - i) * (bt[i + 1] - bt[i]));
+    };
+    const origBtn = h('button', { class: 'btn', disabled: !audioEl, onclick: () => {
+      const was = player && player.kind === 'orig';
+      stopPlayer();
+      if (was) return;
+      audioEl.currentTime = Math.max(0, secOfBeat(page * perPage()) - 0.15);
+      audioEl.play().catch(() => toast('Lecture de l’enregistrement impossible sur cet appareil.'));
+      player = { kind: 'orig', stop: () => audioEl.pause() };
+      origBtn.textContent = '⏹ Arrêter';
+    } }, '▶ Écouter l’original');
+    const transBtn = h('button', { class: 'btn', onclick: () => {
+      const was = player && player.kind === 'trans';
+      stopPlayer();
+      if (was) return;
+      const from = page * perPage();
+      const spb = 60 / (Number(tempo.value) || s.tempo);
+      const queue = s.notes.filter((n) => n.start >= from - 1e-6).sort((a, b) => a.start - b.start);
+      const ac = synth.audioContext();
+      const t0 = ac.currentTime + 0.15;
+      let i = 0;
+      const tick = () => {
+        while (i < queue.length && t0 + (queue[i].start - from) * spb < ac.currentTime + 0.4) {
+          const n = queue[i++];
+          synth.playNote(n.midi, { when: t0 + (n.start - from) * spb, dur: Math.min(4, n.dur * spb), velocity: (n.velocity || 90) / 127, instrument: ctx.settings.instrument });
+        }
+        if (i >= queue.length && ac.currentTime > t0 + (s.totalBeats - from) * spb) stopPlayer();
+      };
+      const timer = setInterval(tick, 60);
+      tick();
+      player = { kind: 'trans', stop: () => { clearInterval(timer); synth.stopAll(); } };
+      transBtn.textContent = '⏹ Arrêter';
+    } }, '▶ Écouter la transcription');
+    onCleanup(() => { stopPlayer(); if (audioUrl) URL.revokeObjectURL(audioUrl); });
+
+    function drawConf() {
+      const t = cur.transcription || {};
+      const pct = Math.round((t.confidence || 0) * 100);
+      const cls = pct >= 90 ? 'good' : pct >= 75 ? 'mid' : 'low';
+      const unc = s.notes.filter((n) => n.uncertain).length;
+      conf.replaceChildren(
+        h('div', { class: 'import-conf-head ' + cls }, [h('b', {}, `Reconnu à ${pct} %`), h('span', { class: 'small' }, pct >= 90 ? 'Très fiable' : pct >= 75 ? 'À vérifier à l’oreille' : 'Enregistrement difficile : vérifie bien')]),
+        h('div', { class: 'progress', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': pct, 'aria-label': 'Confiance de la reconnaissance' }, h('div', { class: 'fill ' + cls, style: `width:${pct}%` })),
+        h('p', { class: 'small' }, [
+          unc ? h('span', {}, [h('span', { class: 'uncertain-dot', 'aria-hidden': 'true' }), ` ${unc} note${unc > 1 ? 's' : ''} incertaine${unc > 1 ? 's' : ''} (en orange sur la portée). `]) : 'Aucune note incertaine. ',
+          `Tonalité : ${t.keyName || '?'}.`,
+          t.tuningCents ? ` Piano accordé ${t.tuningCents > 0 ? '+' : ''}${t.tuningCents} cents.` : '',
+        ]),
+      );
+    }
+    function retune(change) {
+      Object.assign(tune, change);
+      stopPlayer();
+      try {
+        s = build();
+      } catch (err) {
+        return toast(err.message || String(err));
+      }
+      tempo.value = Math.round(s.tempo);
+      refresh();
+    }
+    const seg = (label, options, get, set) => {
+      const box = h('div', { class: 'seg', role: 'group', 'aria-label': label });
+      const paint = () => [...box.children].forEach((b, i) => { const on = get() === options[i][0]; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+      for (const [value, text] of options) box.append(h('button', { class: 'seg-btn', type: 'button', onclick: () => { set(value); paint(); } }, text));
+      paint();
+      return h('div', { class: 'import-tune-row' }, [h('span', { class: 'import-tune-label' }, label), box]);
+    };
+    const sigKey = () => (tune.timeSig ? tune.timeSig.join('/') : 'auto');
+    const tunePanel = analysis ? h('div', { class: 'import-tune' }, [
+      h('h4', {}, 'Réglages rapides'),
+      h('p', { class: 'small muted' }, 'Si la partition ne ressemble pas à ce que tu entends, essaie ces réglages : le résultat se met à jour tout de suite.'),
+      h('div', { class: 'import-tune-row' }, [h('span', { class: 'import-tune-label' }, 'Tempo'), h('div', { class: 'row' }, [
+        h('button', { class: 'btn small', type: 'button', onclick: () => retune({ tempoScale: tune.tempoScale / 2 }) }, '÷ 2'),
+        h('button', { class: 'btn small', type: 'button', onclick: () => retune({ tempoScale: tune.tempoScale * 2 }) }, '× 2'),
+        tuneState,
+      ])]),
+      seg('Notes les plus courtes', [[0, 'Auto'], [0.5, 'Croches'], [0.25, 'Doubles'], [1 / 3, 'Triolets']], () => tune.grid, (v) => retune({ grid: v })),
+      seg('Mesure', [['auto', 'Auto'], ['2/4', '2/4'], ['3/4', '3/4'], ['4/4', '4/4'], ['6/8', '6/8']], sigKey, (v) => retune({ timeSig: v === 'auto' ? null : v.split('/').map(Number) })),
+      seg('Mains', [['both', 'Deux mains'], ['melody', 'Mélodie seule']], () => tune.hands, (v) => retune({ hands: v })),
+      h('div', { class: 'import-tune-row' }, [h('span', { class: 'import-tune-label' }, 'Octave'), h('div', { class: 'row' }, [
+        h('button', { class: 'btn small', type: 'button', 'aria-label': 'Une octave plus bas', onclick: () => retune({ octave: Math.max(-3, tune.octave - 1) }) }, '− 1'),
+        h('button', { class: 'btn small', type: 'button', 'aria-label': 'Une octave plus haut', onclick: () => retune({ octave: Math.min(3, tune.octave + 1) }) }, '+ 1'),
+      ])]),
+      h('div', { class: 'import-tune-row' }, [h('span', { class: 'import-tune-label' }, 'Premier temps'), h('div', { class: 'row' }, [
+        h('button', { class: 'btn small', type: 'button', 'aria-label': 'Décaler les notes d’un temps plus tôt', onclick: () => retune({ shift: tune.shift - 1 }) }, '◀ 1 temps'),
+        h('button', { class: 'btn small', type: 'button', 'aria-label': 'Décaler les notes d’un temps plus tard', onclick: () => retune({ shift: tune.shift + 1 }) }, '1 temps ▶'),
+      ])]),
+    ]) : null;
+
+    function refresh() {
+      info.textContent = importSummary(s, cur);
+      if (analysis) {
+        drawConf();
+        const bits = [`♩ = ${Math.round(s.tempo)}`];
+        if (tune.octave) bits.push(`${tune.octave > 0 ? '+' : ''}${tune.octave} octave${Math.abs(tune.octave) > 1 ? 's' : ''}`);
+        if (tune.shift) bits.push(`décalé de ${tune.shift > 0 ? '+' : ''}${tune.shift} temps`);
+        tuneState.textContent = bits.join(' · ');
+      }
+      draw();
+    }
+    const warnings = (raw.importReport?.warnings || []).map((w) => h('li', {}, w));
     const card = h('div', { class: 'card preview' }, [
       h('h3', {}, (raw.transcribed ? '🎧 Musique transcrite' : '✅ Partition lue') + (name ? ` : ${name}` : '')),
-      raw.transcribed ? h('div', { class: 'block warning', html: '⚠️ Partition obtenue par <b>transcription automatique</b> de l’audio : elle peut contenir des erreurs (surtout avec plusieurs instruments ou beaucoup d’accords). Écoute-la et ajuste le tempo avant de l’ajouter.' }) : null,
-      h('p', {}, `${s.notes.length} notes · ${s.measureCount} mesures · ${s.timeSig[0]}/${s.timeSig[1]} · ${s.hands.R && s.hands.L ? '2 mains' : '1 main'}${s.autoFingering ? ' · doigtés calculés automatiquement' : ' · doigtés de la partition'}`),
+      analysis ? conf : raw.transcribed ? h('div', { class: 'block warning', html: '⚠️ Partition obtenue par <b>transcription automatique</b> de l’audio : elle peut contenir des erreurs. Écoute-la et ajuste le tempo avant de l’ajouter.' }) : null,
+      info,
+      warnings.length ? h('div', { class: 'block warning import-warnings' }, [h('b', {}, 'À savoir'), h('ul', {}, warnings)]) : null,
+      analysis ? h('div', { class: 'row import-listen' }, [origBtn, transBtn]) : null,
+      staffBox,
+      h('div', { class: 'row import-pager' }, [prevBtn, pageLabel, nextBtn]),
+      tunePanel,
       h('div', { class: 'form-grid' }, [h('label', {}, ['Titre', title]), h('label', {}, ['Compositeur', composer]), h('label', {}, ['Tempo (♩/min)', tempo]), h('label', {}, ['Genre', genre]), h('label', {}, ['Niveau', level])]),
-      split, staffBox,
-      h('div', { class: 'row' }, [h('button', { class: 'btn primary', onclick: save }, '💾 Ajouter à ma bibliothèque'), h('button', { class: 'btn', onclick: () => card.remove() }, 'Annuler')]),
+      split,
+      analysis ? h('p', { class: 'small muted' }, 'Une note fausse ou manquante ? Ajoute le morceau puis corrige-le note par note dans l’éditeur.') : null,
+      h('div', { class: 'row' }, [
+        h('button', { class: 'btn primary', onclick: () => save() }, '💾 Ajouter à ma bibliothèque'),
+        h('button', { class: 'btn', onclick: () => save(true) }, '✏️ Corriger note par note'),
+        h('button', { class: 'btn', onclick: () => { stopPlayer(); card.remove(); } }, 'Annuler'),
+      ]),
     ]);
     result.prepend(card);
-    requestAnimationFrame(() => new StaffView(staffBox).render(s, 0, Math.min(s.totalBeats, s.beatsPerMeasure * 4), { settings: ctx.settings, showFingers: true }));
+    info.textContent = importSummary(s, cur);
+    if (analysis) drawConf();
+    requestAnimationFrame(refresh);
 
-    function save() {
+    function save(edit = false) {
+      stopPlayer();
       let notes = dedupe(s.notes.map((n) => ({ ...n, finger: s.autoFingering ? null : n.finger })));
       if (split.querySelector('input').checked) notes = splitHands(notes, Number(splitPt.value) || 60).map((n) => ({ ...n, finger: null }));
-      const out = { ...toRawSong(s, notes), id: s.id, title: title.value || 'Sans titre', composer: composer.value || 'Inconnu', tempo: Number(tempo.value) || s.tempo, timeSig: s.timeSig, keyFifths: s.keyFifths || 0, genre: genre.value, level: Number(level.value), description: 'Partition importée.' };
+      const out = { ...toRawSong(s, notes), id: s.id, title: title.value || 'Sans titre', composer: composer.value || 'Inconnu', tempo: Number(tempo.value) || s.tempo, timeSig: s.timeSig, keyFifths: s.keyFifths || 0, genre: genre.value, level: Number(level.value), description: raw.transcribed ? 'Transcription d’un enregistrement.' : 'Partition importée.' };
       if (!store.saveToLibrary(out)) return toast('Espace de stockage plein : supprime d’anciens imports.');
       ctx.prepared.delete(out.id);
-      toast('Partition ajoutée ! Un cours pas à pas a été créé pour elle.');
-      location.hash = `#/morceau/${out.id}`;
+      toast(edit ? 'Partition ajoutée : corrige-la ici, note par note.' : 'Partition ajoutée ! Un cours pas à pas a été créé pour elle.');
+      location.hash = edit ? `#/editer/${out.id}` : `#/morceau/${out.id}`;
     }
   }
 }

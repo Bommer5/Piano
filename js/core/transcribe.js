@@ -183,7 +183,7 @@ function findPeaks(mag, loBin, hiBin, floor) {
  * @param {Array<{f:number}>} peaks pics triés par fréquence
  * @param {Float64Array} val énergie de chaque pic (modifiée)
  */
-function multiPitch(peaks, val, a4, o, maxNotes, fmax) {
+function multiPitch(peaks, val, a4, o, maxNotes, fmax, collide = new Set()) {
   const freqs = peaks.map((p) => p.f);
   const nearest = (f, tol) => {
     let lo = 0, hi = freqs.length - 1;
@@ -198,20 +198,28 @@ function multiPitch(peaks, val, a4, o, maxNotes, fmax) {
     }
     return best;
   };
-  const cands = new Map();
+  const cands = new Set();
   for (let j = 0; j < peaks.length; j++) {
     if (val[j] <= 0) continue;
     const mf = freqToMidiFloat(freqs[j], a4);
     const m = Math.round(mf);
     if (Math.abs(mf - m) > 0.4 || m < o.lo || m > o.hi) continue;
-    cands.set(m, true);
+    cands.add(m);
   }
+  // Une note dont la fondamentale tombe sur un partiel d'une note déjà présente (octave, douzième…) peut ne
+  // montrer AUCUNE énergie nouvelle à sa fondamentale (les deux ondes s'additionnent ou s'annulent selon leur
+  // phase) : on l'accepte quand même si ses partiels 2 et 3 sont nouveaux.
+  const addCollide = (m) => {
+    for (const d of [12, 19, 24]) if (m + d <= o.hi) { collide.add(m + d); cands.add(m + d); }
+  };
+  for (const m of [...collide]) cands.add(m);
   const res = [];
   const H = 8;
   let firstSal = 0;
   for (let it = 0; it < maxNotes && cands.size; it++) {
     let best = null;
-    for (const m of cands.keys()) {
+    const all = new Map();
+    for (const m of cands) {
       const f0 = midiToFreq(m, a4);
       const A = new Float64Array(H + 2), I = new Int32Array(H + 2).fill(-1);
       let sal = 0;
@@ -221,20 +229,29 @@ function multiPitch(peaks, val, a4, o, maxNotes, fmax) {
         const k = nearest(fh, Math.max(o.binHz * 1.2, fh * 0.022));
         if (k >= 0) { A[h] = val[k]; I[h] = k; sal += A[h] / Math.sqrt(h); }
       }
-      if (A[1] <= 0) { cands.delete(m); continue; }
-      if (!best || sal > best.sal) best = { m, sal, A, I };
+      let hidden = false;
+      if (A[1] <= 0) {
+        if (!(collide.has(m) && A[2] > 0 && A[3] > 0)) continue;
+        hidden = true;
+      }
+      if (!best || sal > best.sal) best = { m, sal, A, I, hidden, a3: A[3], a2: A[2] };
+      all.set(m, { m, sal, A, I, hidden });
     }
     if (!best) break;
+    // octave : la note du dessous l'emporte si ses partiels impairs (absents de l'octave) sont bien là
+    const sub = all.get(best.m - 12);
+    if (sub && sub.sal >= 0.75 * best.sal && sub.A[3] > 0.2 * sub.A[2] && sub.A[2] > 0) best = sub;
     if (!firstSal) firstSal = best.sal;
     if (best.sal < firstSal * o.relThreshold) break;
     cands.delete(best.m);
+    addCollide(best.m);
     const { A, I } = best;
     for (let h = 1; h <= H; h++) {
       if (I[h] < 0) continue;
       const e = h === 1 ? A[1] : Math.min(A[h], Math.max(A[h - 1], A[h + 1]));
       val[I[h]] = Math.max(0, val[I[h]] - e);
     }
-    res.push({ midi: best.m, sal: best.sal, amp1: A[1] });
+    res.push({ midi: best.m, sal: best.sal, amp1: A[1], hidden: best.hidden });
   }
   return res;
 }
@@ -242,75 +259,6 @@ function multiPitch(peaks, val, a4, o, maxNotes, fmax) {
 // ---------------------------------------------------------------------------
 // Tempo, pulsation, mesure, tonalité
 // ---------------------------------------------------------------------------
-
-function estimatePeriod(env, fps) {
-  // autocorrélation entre 50 et 200 BPM, préférence douce autour de 100 BPM (60-140)
-  const minLag = Math.round((60 / 200) * fps), maxLag = Math.round((60 / 50) * fps);
-  const n = env.length;
-  let best = -1, bestLag = Math.round(0.6 * fps);
-  const sc = new Float64Array(maxLag + 2);
-  for (let lag = minLag; lag <= maxLag + 1; lag++) {
-    let s = 0;
-    for (let i = 0; i + lag < n; i++) s += env[i] * env[i + lag];
-    sc[lag] = s;
-  }
-  for (let lag = minLag; lag <= maxLag; lag++) {
-    const bpm = (60 * fps) / lag;
-    const prior = Math.exp(-0.5 * Math.pow(Math.log2(bpm / 100) / 0.8, 2));
-    const local = sc[lag] >= sc[lag - 1] && sc[lag] >= sc[lag + 1];
-    const v = sc[lag] * prior * (local ? 1 : 0.9);
-    if (v > best) { best = v; bestLag = lag; }
-  }
-  let lag = bestLag;
-  if (bestLag > minLag && bestLag < maxLag) {
-    const a = sc[bestLag - 1], b = sc[bestLag], c = sc[bestLag + 1];
-    const d = a - 2 * b + c;
-    if (d < 0) lag += clamp((0.5 * (a - c)) / d, -0.5, 0.5);
-  }
-  return lag / fps;
-}
-
-/** Affine la période sur les instants d'attaque (périodogramme pondéré). */
-function refinePeriod(P, times, weights) {
-  if (times.length < 4) return P;
-  let bestP = P, best = -1;
-  for (let r = 0.94; r <= 1.0601; r += 0.002) {
-    const p = P * r;
-    let cs = 0, sn = 0;
-    for (let i = 0; i < times.length; i++) {
-      const ph = (2 * Math.PI * times[i]) / p;
-      cs += weights[i] * Math.cos(ph);
-      sn += weights[i] * Math.sin(ph);
-    }
-    const v = Math.hypot(cs, sn) * (1 - 0.5 * Math.abs(r - 1));
-    if (v > best) { best = v; bestP = p; }
-  }
-  return bestP;
-}
-
-/** Suivi de pulsation par programmation dynamique (Ellis 2007). */
-function trackBeats(env, fps, P) {
-  const T = env.length;
-  const p = P * fps;
-  const C = new Float64Array(T), back = new Int32Array(T).fill(-1);
-  const alpha = 50;
-  for (let t = 0; t < T; t++) {
-    const lo = Math.max(0, Math.round(t - 2 * p)), hi = Math.round(t - p / 2);
-    let best = -Infinity, arg = -1;
-    for (let tau = lo; tau <= hi; tau++) {
-      const l = Math.log((t - tau) / p);
-      const v = C[tau] - alpha * l * l;
-      if (v > best) { best = v; arg = tau; }
-    }
-    C[t] = env[t] + (arg >= 0 ? best : 0);
-    back[t] = arg;
-  }
-  let end = T - 1;
-  for (let t = Math.max(0, Math.round(T - 1 - p)); t < T; t++) if (C[t] > C[end]) end = t;
-  const beats = [];
-  for (let t = end; t >= 0; t = back[t]) beats.push(t / fps);
-  return beats.reverse();
-}
 
 const KS_MAJOR = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
 const KS_MINOR = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
@@ -356,31 +304,208 @@ export function estimateKey(notes) {
   return best;
 }
 
-/** Mesure (3/4 ou 4/4) et position du premier temps fort à partir des accents par temps. */
-function estimateMeter(acc) {
-  const n = acc.length;
-  if (n < 6) return { num: 4, phase: 0, scores: {} };
-  const mean = acc.reduce((x, y) => x + y, 0) / n;
-  const scores = {}, means = {};
-  // statistique F : le motif d'accents se répète-t-il toutes les M pulsations ?
-  for (const M of [2, 3, 4]) {
-    const sum = new Array(M).fill(0), cnt = new Array(M).fill(0);
-    for (let k = 0; k < n; k++) { sum[k % M] += acc[k]; cnt[k % M]++; }
-    const m = sum.map((v, i) => v / Math.max(1, cnt[i]));
-    let ssb = 0, ssw = 0;
-    for (let i = 0; i < M; i++) ssb += cnt[i] * (m[i] - mean) * (m[i] - mean);
-    for (let k = 0; k < n; k++) ssw += (acc[k] - m[k % M]) * (acc[k] - m[k % M]);
-    scores[M] = ssb / (M - 1) / (ssw / Math.max(1, n - M) + 0.01 * mean * mean + 1e-9);
-    means[M] = m;
+/**
+ * Analyse rythmique. À partir des attaques (groupes de notes simultanées) et d'un premier suivi de pulsation,
+ * retrouve : la plus petite valeur de note régulière (« tatum »), le temps, la mesure, le premier temps,
+ * et la grille de quantification adaptée au morceau.
+ *
+ * 1. Les attaques sont placées dans le temps « redressé » par la pulsation suivie (le rubato disparaît).
+ * 2. Le tatum est la plus grande subdivision de cette pulsation sur laquelle tombent presque toutes les attaques.
+ * 3. Chaque hypothèse (tatums par temps, temps par mesure, position du premier temps) est comparée aux
+ *    accents réels (notes longues, fortes, basses, accords) : la meilleure corrélation l'emporte, avec une
+ *    légère préférence pour un tempo « naturel » (60-130) — ce qui corrige les erreurs double/moitié et 4:3.
+ * @returns {{beatTimes:number[], tempo:number, timeSig:[number,number], grid:number, tatum:number, fit:number,
+ *   margin:number, scores:object, alternatives:Array}} beatTimes = instants des NOIRES, la première tombe sur
+ *   une barre de mesure (au plus tard à la première note : une levée est donc précédée d'un silence).
+ */
+const RW = 1, TW = 0.14, TC = 84;
+/** En dessous de cette confiance, une note est signalée « incertaine ». */
+export const UNCERTAIN = 0.63;
+function analyzeRhythm(gs, isMono, lastEnd) {
+  const N = gs.length;
+  // 1. tatum : période τ pour laquelle les écarts entre attaques proches (< 4 s) sont des multiples de τ.
+  //    Les paires proches seulement : un tempo qui respire (rubato) ne brouille pas la mesure.
+  const pairs = [];
+  for (let a = 0; a < N; a++) {
+    for (let b = a + 1; b < N && gs[b].t - gs[a].t < 4; b++) {
+      const dt = gs[b].t - gs[a].t;
+      pairs.push(dt, gs[a].w * gs[b].w * Math.exp(-dt / 2.5));
+    }
   }
-  const three = n >= 9 && scores[3] > 2 && scores[3] > 1.3 * Math.max(scores[4], scores[2]);
-  const num = three ? 3 : 4;
-  const m = means[num];
-  let phase = 0;
-  for (let i = 1; i < num; i++) if (m[i] > m[phase]) phase = i;
-  // anacrouse seulement si un autre placement du temps fort est nettement plus convaincant
-  if (phase !== 0 && (scores[num] < 2 || m[phase] - m[0] < 0.25 * mean)) phase = 0;
-  return { num, phase, scores };
+  let tatumSec = 0.5;
+  if (pairs.length >= 6) {
+    let wsum = 0;
+    for (let i = 1; i < pairs.length; i += 2) wsum += pairs[i];
+    const taus = [], sc = [];
+    for (let tau = 0.085; tau <= 4; tau *= 1.004) {
+      let v = 0;
+      const k = (2 * Math.PI) / tau;
+      for (let i = 0; i < pairs.length; i += 2) v += pairs[i + 1] * Math.cos(k * pairs[i]);
+      taus.push(tau); sc.push(v / wsum);
+    }
+    let smax = -1;
+    for (const v of sc) if (v > smax) smax = v;
+    // le plus grand τ presque aussi bon que le meilleur (τ/2, τ/3… sont toujours aussi bons que τ)
+    let bi = 0;
+    for (let i = 1; i < sc.length - 1; i++) if (sc[i] >= 0.85 * smax && sc[i] >= sc[i - 1] && sc[i] >= sc[i + 1]) bi = i;
+    tatumSec = taus[bi];
+    if (bi > 0 && bi < sc.length - 1) {
+      const d = sc[bi - 1] - 2 * sc[bi] + sc[bi + 1];
+      if (d < 0) tatumSec = taus[bi] * Math.pow(1.004, clamp((0.5 * (sc[bi - 1] - sc[bi + 1])) / d, -0.5, 0.5));
+    }
+    while (tatumSec > 1.0) tatumSec /= 2;
+  } else if (N >= 2) {
+    tatumSec = gs[1].t - gs[0].t;
+    while (tatumSec > 1.0) tatumSec /= 2;
+    while (tatumSec < 0.12) tatumSec *= 2;
+  }
+  // 2. suivi du tatum d'attaque en attaque (boucle à verrouillage de phase : suit les variations de tempo)
+  const j = new Array(N), res = new Array(N);
+  const anchors = [];
+  {
+    let tau = tatumSec, tRef = gs[0].t, xRef = 0;
+    anchors.push({ t: tRef, x: 0 });
+    for (let i = 0; i < N; i++) {
+      const xx = xRef + (gs[i].t - tRef) / tau;
+      const jx = Math.round(xx), err = xx - jx;
+      j[i] = jx; res[i] = err;
+      if (Math.abs(err) < 0.3 && jx > xRef) {
+        const steps = jx - xRef;
+        tau = clamp(tau * (1 + (0.3 * err) / steps), tatumSec * 0.8, tatumSec * 1.25);
+        tRef = gs[i].t - 0.4 * err * tau;
+        xRef = jx;
+        anchors.push({ t: tRef, x: xRef });
+      }
+    }
+    if (anchors.length < 2) anchors.push({ t: anchors[0].t + tatumSec, x: 1 });
+  }
+  const J = Math.max(...j) + 1;
+  const tatumToSec = (q) => {
+    const A = anchors, L = A.length;
+    let i = 0;
+    if (q <= A[0].x) i = 0;
+    else if (q >= A[L - 1].x) i = L - 2;
+    else { let lo = 0, hi = L - 1; while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (A[mid].x <= q) lo = mid; else hi = mid; } i = lo; }
+    // aux extrémités : on prolonge au tempo moyen (pas à celui du dernier intervalle, trop bruité)
+    if (q < A[0].x) return A[0].t + (q - A[0].x) * tatumSec;
+    if (q > A[L - 1].x) return A[L - 1].t + (q - A[L - 1].x) * tatumSec;
+    return A[i].t + ((q - A[i].x) * (A[i + 1].t - A[i].t)) / (A[i + 1].x - A[i].x);
+  };
+  {
+    // tatum médian réellement suivi
+    const iv = [];
+    for (let i = 1; i < anchors.length; i++) iv.push((anchors[i].t - anchors[i - 1].t) / (anchors[i].x - anchors[i - 1].x));
+    if (iv.length >= 3) tatumSec = median(iv);
+  }
+
+  // 3. accents par position de tatum
+  const mw = gs.reduce((s, g) => s + g.w, 0) / N;
+  const sw = Math.sqrt(gs.reduce((s, g) => s + (g.w - mw) * (g.w - mw), 0) / N);
+  const A = new Float64Array(J);
+  for (let i = 0; i < N; i++) {
+    const g = gs[i];
+    const ioi = i + 1 < N ? Math.max(1, j[i + 1] - j[i]) : Math.max(1, Math.round(g.len / tatumSec));
+    const durSecs = ioi * tatumSec;
+    let a = 1 + 0.5 * clamp((g.w - mw) / (sw + 0.03), -2, 2);
+    a += 0.7 * clamp(Math.log2(ioi), 0, 3) * (durSecs > 0.25 ? 1 : 0.5);
+    if (!isMono) {
+      const pl = i > 0 ? gs[i - 1].low : Infinity, nl = i + 1 < N ? gs[i + 1].low : Infinity;
+      if (g.low < pl - 2 && g.low < nl - 2) a += 0.8;
+      a += 0.25 * Math.min(g.n - 1, 3);
+    }
+    if (a > A[j[i]]) A[j[i]] = a;
+  }
+  // part des écarts entre attaques successives qui valent exactement k tatums : la valeur de note la plus
+  // fréquente est très souvent le temps
+  const ioiShare = (k) => {
+    let c = 0;
+    for (let i = 1; i < N; i++) if (j[i] - j[i - 1] === k) c++;
+    return N > 1 ? c / (N - 1) : 0;
+  };
+  const hyps = [];
+  if (N >= 12 && J >= 16) {
+    for (const k of [1, 2, 3, 4, 6, 8]) {
+      const compound = k === 3 || k === 6;
+      const qt = compound ? (2 * k) / 3 : k; // tatums par noire
+      const bpm = 60 / (qt * tatumSec);
+      if (bpm < 38 || bpm > 215) continue;
+      for (const m of [2, 3, 4]) {
+        const L = k * m;
+        if (L * 2.5 > J) continue;
+        // gabarit métrique
+        const W = new Float64Array(L);
+        for (let pos = 0; pos < L; pos++) {
+          let w = 0;
+          if (pos === 0) w = 4;
+          else if (pos % k === 0) w = m === 4 && pos === 2 * k ? 2.6 : 2;
+          else if (k % 2 === 0 && pos % (k / 2) === 0) w = 1;
+          else if (k % 4 === 0 && pos % (k / 4) === 0) w = 0.4;
+          W[pos] = w;
+        }
+        let best = { c: -Infinity, phi: 0 };
+        const tmp = new Float64Array(J);
+        for (let phi = 0; phi < L; phi++) {
+          for (let q = 0; q < J; q++) tmp[q] = W[(((q - phi) % L) + L) % L];
+          let c = corr(A, tmp);
+          if (j[0] % L === phi) c += 0.05; // à qualité égale : pas de levée
+          if (c > best.c) best = { c, phi };
+        }
+        const barSec = L * tatumSec;
+        // le motif d'accents se répète-t-il de mesure en mesure ? (part de variance expliquée, ajustée)
+        let r2 = 0;
+        {
+          const sum = new Float64Array(L), cnt = new Float64Array(L);
+          let mean = 0;
+          for (let q = 0; q < J; q++) { sum[q % L] += A[q]; cnt[q % L]++; mean += A[q]; }
+          mean /= J;
+          let ssb = 0, sst = 0;
+          for (let q = 0; q < L; q++) if (cnt[q]) ssb += cnt[q] * Math.pow(sum[q] / cnt[q] - mean, 2);
+          for (let q = 0; q < J; q++) sst += (A[q] - mean) * (A[q] - mean);
+          r2 = sst > 0 && J > L + 1 ? 1 - ((1 - ssb / sst) * (J - 1)) / (J - L) : 0;
+        }
+        // préférences légères : tempo « naturel », mesure de 2 à 3 s, 4/4 plus courant que 2/4 et que 6/8
+        const prior = -TW * Math.pow(Math.log2(bpm / TC), 2) - 0.06 * Math.pow(Math.log2(barSec / 2.5), 2) + (compound ? -0.06 : m === 4 ? 0.04 : m === 2 ? -0.1 : 0);
+        hyps.push({ k, m, phi: best.phi, corr: best.c, r2, score: best.c + RW * r2 + prior + (isMono ? 0.1 : 0.04) * ioiShare(k), bpm, qt, compound, L });
+      }
+    }
+  }
+  hyps.sort((a, b) => b.score - a.score);
+  let h = hyps[0];
+  if (!h) {
+    // trop peu d'attaques pour juger de la mesure : 4/4 sans levée ; le temps = la valeur de note la plus fréquente
+    let qt = 1, bs = -Infinity;
+    for (const k of [1, 2, 4, 8]) {
+      const bpm = 60 / (k * tatumSec);
+      if (bpm < 38 || bpm > 215) continue;
+      const v = ioiShare(k) - 0.3 * Math.pow(Math.log2(bpm / 92), 2);
+      if (v > bs) { bs = v; qt = k; }
+    }
+    h = { k: qt, m: 4, phi: j[0] % (qt * 4), corr: 0, score: 0, bpm: 60 / (qt * tatumSec), qt, compound: false, L: qt * 4 };
+  }
+  const other = hyps.find((y) => y.L !== h.L || y.qt !== h.qt);
+  const margin = other ? h.score - other.score : 0.3;
+  const timeSig = h.compound ? [3 * h.m, 8] : [h.m, 4];
+  // barre de mesure au plus tard à la première note
+  let b0 = h.phi;
+  while (b0 > j[0]) b0 -= h.L;
+  while (b0 + h.L <= j[0]) b0 += h.L;
+  const beatTimes = [];
+  const endQ = (lastEnd - tatumToSec(b0)) / (h.qt * tatumSec) + 2;
+  for (let q = 0; q <= Math.max(2, Math.ceil(endQ)); q++) beatTimes.push(tatumToSec(b0 + q * h.qt));
+  const iv = [];
+  for (let i = 1; i < beatTimes.length; i++) iv.push(beatTimes[i] - beatTimes[i - 1]);
+  const tempo = Math.round(60 / median(iv));
+  // grille : le tatum, ou sa moitié si des attaques tombent nettement entre deux tatums
+  const between = res.filter((r) => Math.abs(r) > 0.3).length;
+  let grid = 1 / h.qt;
+  if (between >= Math.max(2, 0.03 * N)) grid /= 2;
+  grid = clamp(grid, 0.125, 0.5);
+  const fit = 1 - Math.min(1, (2 * res.reduce((s, r) => s + Math.min(Math.abs(r), 0.5 - Math.abs(r)), 0)) / N / 0.25);
+  return {
+    beatTimes, tempo, timeSig, grid, tatum: tatumSec, fit, margin,
+    scores: Object.fromEntries(hyps.slice(0, 6).map((y) => [`${y.compound ? 3 * y.m + '/8' : y.m + '/4'}@${Math.round(y.bpm)}`, Math.round(y.score * 1000) / 1000 ])),
+    alternatives: hyps.slice(0, 4).map((y) => ({ tempo: Math.round(y.bpm), timeSig: y.compound ? [3 * y.m, 8] : [y.m, 4], score: y.score })),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -601,7 +726,10 @@ function* run(samples, sampleRate, opts, out) {
     }
   }
   const bounds = [...onsets];
-  for (const c of changes) if (!onsets.some((on) => Math.abs(on.t - c.t) < 0.1) && c.t > 0) bounds.push(c);
+  const legato = changes.filter((c) => !onsets.some((on) => Math.abs(on.t - c.t) < 0.1) && c.t > 0);
+  // piano (presque toutes les notes ont une attaque) : les rares « changements de hauteur » sans attaque sont
+  // des mélanges de résonances, pas des notes ; ils ne servent que pour les sons liés (voix, flûte, violon)
+  if (legato.length > 0.25 * onsets.length) bounds.push(...legato);
   bounds.sort((a, b) => a.t - b.t);
 
   // Débuts de silence (fin forcée des notes)
@@ -674,18 +802,6 @@ function* run(samples, sampleRate, opts, out) {
     twoSpectra(x, sPre, Lpre, sPost, Lpost, N, pre, post);
     // fenêtres courtes juste avant / juste après : détectent les re-frappes malgré la résonance
     twoSpectra(x, Math.round((tb - 0.012) * sr) - LS, LS, Math.round((tb + 0.012) * sr), LS, NS, preS, postS);
-    const activeHarm = (f) => active.some((a) => {
-      const r = f / midiToFreq(a.midi, a4);
-      const h = Math.round(r);
-      return h >= 1 && h <= 3 && Math.abs(r / h - 1) < 0.03;
-    });
-    const shortNew = (f) => {
-      // une fenêtre de 46 ms ne sépare pas les graves voisins (battements) : réservé aux f > 250 Hz
-      if (f < 250) return 0;
-      const a = ampAt(postS, f, binHzS, 0.03), b = ampAt(preS, f, binHzS, 0.03);
-      // ×1.5 : la résonance de la note précédente masque une partie de la re-frappe
-      return a > 0 && bounds[bi].kind === 'onset' ? Math.min(1, Math.max(0, (1.5 * (a - b)) / a)) : 0;
-    };
     // plancher de bruit
     const band = Array.from(post.subarray(loBin, hiBin));
     const floor = Math.max(median(band) * 4, 0.0015);
@@ -697,21 +813,82 @@ function* run(samples, sampleRate, opts, out) {
     for (const p of peaks) {
       p.f = p.bin * binHz;
       p.pre = Math.max(pre[p.idx - 1] || 0, pre[p.idx], pre[p.idx + 1] || 0);
-      // la mesure courte ne sert qu'aux notes déjà actives (re-frappe) : ailleurs, le « clic »
-      // d'attaque d'une autre note la fausserait
-      const rel = activeHarm(p.f);
-      p.newAmp = Math.max(p.amp - p.pre, rel ? p.amp * shortNew(p.f) : 0, 0);
+      p.newAmp = Math.max(p.amp - p.pre, 0);
     }
     const val = Float64Array.from(peaks, (p) => p.newAmp);
-    let found = multiPitch(peaks, val, a4, o, o.maxPolyphony, fmax);
+    const collide = new Set();
+    for (const a of active) for (const d of [12, 19, 24]) if (a.midi + d <= o.hi) collide.add(a.midi + d);
+    let found = multiPitch(peaks, val, a4, o, o.maxPolyphony, fmax, collide);
     found = found.filter((c) => {
       const f0 = midiToFreq(c.midi, a4);
       const postA = ampAt(post, f0, binHz), preA = ampAt(pre, f0, binHz);
       c.amp0 = postA;
       c.amp0h2 = ampAt(post, 2 * f0, binHz);
+      c.newFrac = postA > 0 ? (postA - preA) / postA : 0;
       // énergie réellement nouvelle (au moins +30 %) et au-dessus du bruit
-      return postA > floor * 1.5 && Math.max((postA - preA) / postA, activeHarm(f0) ? shortNew(f0) : 0) > 0.28;
+      return postA > floor * 1.5 && (c.hidden || c.newFrac > 0.28);
     });
+    // Notes REFRAPPÉES pendant qu'elles résonnent : la fondamentale ne grossit presque pas, mais le marteau
+    // relance tous les partiels aigus (qui s'éteignent vite). On compare deux fenêtres courtes juste avant /
+    // juste après la frappe, sur les partiels assez hauts pour ne pas être confondus avec une note voisine.
+    if (bounds[bi].kind === 'onset' && active.length) {
+      const bandS = Array.from(postS.subarray(Math.round(400 / binHzS), Math.round(fmax / binHzS)));
+      const floorS = Math.max(median(bandS) * 3, 0.0008);
+      const HARM = [12, 19, 24, 28, 31, 34, 36];
+      const hits = [];
+      for (const a of active) {
+        if (tb - a.startSec < 0.07 || found.some((c) => c.midi === a.midi)) continue;
+        // une note plus grave dont celle-ci est un harmonique explique à elle seule le regain des partiels
+        if (found.some((c) => HARM.includes(a.midi - c.midi))) continue;
+        const others = [];
+        for (const c of found) {
+          if (HARM.includes(c.midi - a.midi)) continue; // « fantôme » possible de la refrappe elle-même
+          const fc = midiToFreq(c.midi, a4);
+          for (let h = 1; h <= 12; h++) others.push(fc * h);
+        }
+        // partiels partagés avec une autre note tenue : leur niveau ne dit rien de cette note-ci
+        for (const b of active) {
+          if (b === a) continue;
+          const fb = midiToFreq(b.midi, a4);
+          for (let h = 1; h <= 12; h++) others.push(fb * h);
+        }
+        const f0 = midiToFreq(a.midi, a4);
+        let N = 0, K = 0, No = 0, Ko = 0, sPostA = 0, sNew = 0;
+        for (let h = 1; h <= 12; h++) {
+          const fh = f0 * h * Math.sqrt(1 + 0.0003 * h * h);
+          if (fh > fmax) break;
+          let up;
+          if (fh < 500) {
+            // partiels graves : fenêtres longues (les courtes ne séparent pas deux notes voisines)
+            const tol = Math.max(2.5 * binHz, fh * 0.03);
+            if (others.some((f) => Math.abs(f - fh) < tol)) continue;
+            const pa = ampAt(post, fh, binHz), pb = ampAt(pre, fh, binHz);
+            if (pa < floor * 1.5) continue;
+            up = pa > pb * 1.12;
+            sPostA += pa; sNew += Math.max(0, pa - pb);
+          } else {
+            if (others.some((f) => Math.abs(f - fh) < 55)) continue;
+            // partiels qui étaient visibles à la frappe d'origine : refrappés, ils retrouvent un niveau comparable
+            const p0 = a.prof ? a.prof[h] : 0;
+            if (p0 < floorS) continue;
+            const pa = ampAt(postS, fh, binHzS, 0.02), pb = ampAt(preS, fh, binHzS, 0.02);
+            up = pa > pb * 1.25 && pa > 0.3 * p0;
+            sPostA += pa; sNew += Math.max(0, pa - pb);
+          }
+          N++; if (h % 2) No++;
+          if (up) { K++; if (h % 2) Ko++; }
+        }
+        const frac = sPostA > 0 ? sNew / sPostA : 0;
+        if (N >= 2 && K >= (N < 4 ? N : 0.6 * N) && (No < 2 || Ko >= 0.5 * No) && frac > 0.15) hits.push({ a, frac, q: K / N });
+      }
+      for (const { a, frac, q } of hits) {
+        const f0 = midiToFreq(a.midi, a4);
+        const postA = ampAt(post, f0, binHz);
+        // les harmoniques de la note refrappée ne sont pas des notes à part entière
+        found = found.filter((c) => !(HARM.includes(c.midi - a.midi) && c.amp0 < 0.8 * postA));
+        found.push({ midi: a.midi, sal: postA, amp1: postA, amp0: postA, amp0h2: ampAt(post, 2 * f0, binHz), newFrac: frac, restrike: q });
+      }
+    }
     // Repli : hauteur YIN stable juste après la frontière
     if (!found.length) {
       const i0 = Math.ceil(((tb + 0.03) * fps) / yinStep), i1 = Math.floor(((Math.min(nextT, tb + 0.15)) * fps) / yinStep);
@@ -722,7 +899,7 @@ function* run(samples, sampleRate, opts, out) {
         const f0 = midiToFreq(m, a4);
         const postA = ampAt(post, f0, binHz), preA = ampAt(pre, f0, binHz);
         if (m >= o.lo && m <= o.hi && postA > floor && (postA - preA) / postA > 0.2) {
-          found = [{ midi: m, sal: postA, amp1: postA, amp0: postA, amp0h2: ampAt(post, 2 * f0, binHz) }];
+          found = [{ midi: m, sal: postA, amp1: postA, amp0: postA, amp0h2: ampAt(post, 2 * f0, binHz), newFrac: (postA - preA) / postA, yin: true }];
         }
       }
     }
@@ -732,13 +909,21 @@ function* run(samples, sampleRate, opts, out) {
     }
     if (found.length) {
       const level = rmsBetween(tb * sr, (tb + 0.08) * sr);
+      const maxSal = Math.max(...found.map((c) => c.sal));
       for (const c of found) {
         // une note identique encore active est re-frappée
         active = active.filter((a) => {
           if (a.midi === c.midi) { endNote(a, tb); return false; }
           return true;
         });
-        active.push({ midi: c.midi, startSec: tb, sal: c.sal, amp0: c.amp0, amp0h2: c.amp0h2, lastAmp: c.amp0, lastT: tb + 0.02 + Lpost / sr / 2, floor: floor * 1.2, level, kind: bounds[bi].kind });
+        const prof = new Float64Array(13);
+        const fc = midiToFreq(c.midi, a4);
+        for (let h = 1; h <= 12; h++) {
+          const fh = fc * h * Math.sqrt(1 + 0.0003 * h * h);
+          if (fh > fmax) break;
+          prof[h] = ampAt(postS, fh, binHzS, 0.02);
+        }
+        active.push({ prof, hidden: c.hidden, midi: c.midi, startSec: tb, sal: c.sal, amp0: c.amp0, amp0h2: c.amp0h2, lastAmp: c.amp0, lastT: tb + 0.02 + Lpost / sr / 2, floor: floor * 1.2, level, kind: bounds[bi].kind, newFrac: c.newFrac || 0, restrike: c.restrike, yin: c.yin, rel: c.sal / maxSal });
       }
     } else {
       // pas de note nouvelle : vérifier tout de même l'extinction des notes actives
@@ -797,24 +982,74 @@ function* run(samples, sampleRate, opts, out) {
       else nt.hand = hi < 55 || (below > 0.8 && median(mids) < 55) ? 'L' : 'R';
     }
   } else {
-    const tops = median(groups.map((g) => Math.max(...g.notes.map((nt) => nt.midi))));
-    let melEnd = -Infinity, melMidi = null;
-    for (const g of groups) {
+    // Deux mains : chaque main suit sa ligne. On part de deux « centres » (grave / aigu) estimés sur tout le
+    // morceau, puis, attaque après attaque, on coupe l'accord là où chaque note reste le plus près de la
+    // position courante de sa main (une main ne couvre guère plus d'une octave).
+    const all = cleaned.map((nt) => nt.midi).sort((a, b) => a - b);
+    let cL = all[Math.floor(all.length * 0.2)], cR = all[Math.floor(all.length * 0.8)];
+    for (let it = 0; it < 6; it++) {
+      let sl = 0, nl = 0, sr2 = 0, nr = 0;
+      for (const m of all) { if (Math.abs(m - cL) < Math.abs(m - cR)) { sl += m; nl++; } else { sr2 += m; nr++; } }
+      if (nl) cL = sl / nl;
+      if (nr) cR = sr2 / nr;
+    }
+    // une seule main (mélodie doublée, accords serrés) : tout tient sous une main et les deux centres se touchent
+    const maxSpan = Math.max(...groups.map((g) => g.notes[0].midi - g.notes[g.notes.length - 1].midi));
+    const oneHand = cR - cL < 10 && maxSpan <= 14;
+    if (cR - cL < 7) { const mid = (cR + cL) / 2; cL = mid - 6; cR = mid + 6; }
+    const gCL = cL, gCR = cR;
+    if (oneHand) {
+      const hand = median(all) < 52 ? 'L' : 'R';
+      for (const nt of cleaned) nt.hand = hand;
+    }
+    for (const g of oneHand ? [] : groups) {
       g.notes.sort((a, b) => b.midi - a.midi);
-      const top = g.notes[0];
-      const melodyActive = melEnd > g.t + 0.05;
-      const isMelody = melodyActive ? top.midi >= melMidi - 7 : top.midi >= Math.max(48, tops - 12);
-      g.notes.forEach((nt, i) => (nt.hand = i === 0 && isMelody ? 'R' : 'L'));
-      if (isMelody) { melEnd = top.endSec; melMidi = top.midi; }
+      const n = g.notes.length;
+      let best = 0, bc = Infinity;
+      for (let sp = 0; sp <= n; sp++) {
+        let c = 0;
+        for (let i = 0; i < n; i++) c += Math.abs(g.notes[i].midi - (i < sp ? cR : cL));
+        if (sp > 1) c += 10 * Math.max(0, g.notes[0].midi - g.notes[sp - 1].midi - 12);
+        if (n - sp > 1) c += 10 * Math.max(0, g.notes[sp].midi - g.notes[n - 1].midi - 12);
+        if (c < bc) { bc = c; best = sp; }
+      }
+      g.notes.forEach((nt, i) => (nt.hand = i < best ? 'R' : 'L'));
+      const upd = (c, arr, g0) => {
+        if (!arr.length) return 0.97 * c + 0.03 * g0; // main au repos : revient doucement vers sa zone
+        const mean = arr.reduce((x, nt) => x + nt.midi, 0) / arr.length;
+        return 0.65 * c + 0.35 * mean;
+      };
+      cR = upd(cR, g.notes.slice(0, best), gCR);
+      cL = upd(cL, g.notes.slice(best), gCL);
+      if (cR - cL < 5) { const mid = (cR + cL) / 2; cL = mid - 2.5; cR = mid + 2.5; }
       // accompagnement limité : la basse + les notes les plus fortes
-      const left = g.notes.filter((nt) => nt.hand === 'L');
-      if (left.length > o.maxAccompaniment) {
-        const bass = left[left.length - 1];
-        const keep = new Set([bass, ...left.slice(0, -1).sort((a, b) => b.amp0 - a.amp0).slice(0, o.maxAccompaniment - 1)]);
-        g.notes = g.notes.filter((nt) => nt.hand === 'R' || keep.has(nt));
+      for (const hand of ['L', 'R']) {
+        const part = g.notes.filter((nt) => nt.hand === hand);
+        const max = hand === 'L' ? o.maxAccompaniment : 4;
+        if (part.length > max) {
+          const edge = hand === 'L' ? part[part.length - 1] : part[0];
+          const keep = new Set([edge, ...part.filter((nt) => nt !== edge).sort((a, b) => b.amp0 - a.amp0).slice(0, max - 1)]);
+          g.notes = g.notes.filter((nt) => nt.hand !== hand || keep.has(nt));
+        }
       }
     }
     cleaned = groups.flatMap((g) => g.notes);
+  }
+  // confiance de chaque note (0..1) : énergie vraiment nouvelle, force relative dans l'accord, risque d'harmonique
+  for (const g of groups) {
+    const maxSal = Math.max(...g.notes.map((nt) => nt.sal));
+    for (const nt of g.notes) {
+      let c;
+      if (nt.restrike) c = 0.55 + 0.4 * clamp((nt.newFrac - 0.15) / 0.45, 0, 1) * (nt.restrike >= 0.8 ? 1 : 0.6);
+      else if (nt.hidden) c = 0.6;
+      else if (nt.yin || nt.kind === 'pitch') c = 0.45;
+      else c = 0.55 + 0.45 * clamp((nt.newFrac - 0.28) / 0.35, 0, 1);
+      const rel = nt.sal / (maxSal || 1);
+      if (rel < 0.3) c *= 0.5 + 1.6 * rel;
+      if (g.notes.some((x) => x !== nt && [12, 19, 24, 28].includes(nt.midi - x.midi) && x.amp0 > nt.amp0 * 1.5)) c *= 0.75;
+      if (nt.endSec - nt.startSec < 0.09) c *= 0.7;
+      nt.conf = clamp(c, 0, 1);
+    }
   }
   // chaque main : une note ne déborde pas sur l'attaque suivante (MD = ligne mélodique, MG = accords)
   for (const hand of ['R', 'L']) {
@@ -840,93 +1075,35 @@ function* run(samples, sampleRate, opts, out) {
   }
 
   // 7. Tempo, pulsations, mesure, tonalité ------------------------------------------
-  const efps = 100;
   const lastEnd = Math.max(...cleaned.map((nt) => nt.endSec));
-  const T = Math.ceil(lastEnd * efps) + 2;
-  const env = new Float64Array(T);
-  const gTimes = [], gW = [];
-  {
-    const gs = [];
-    for (const nt of cleaned) {
-      const g = gs[gs.length - 1];
-      if (g && nt.startSec - g.t < 0.035) { g.w = Math.max(g.w, nt.velocity / 127); g.n++; }
-      else gs.push({ t: nt.startSec, w: nt.velocity / 127, n: 1 });
-    }
-    for (const g of gs) {
-      const w = g.w * (1 + 0.15 * Math.min(g.n - 1, 3));
-      gTimes.push(g.t); gW.push(w);
-      for (let d = -6; d <= 6; d++) {
-        const i = Math.round(g.t * efps) + d;
-        if (i >= 0 && i < T) env[i] += w * Math.exp(-0.5 * (d / 2) * (d / 2));
-      }
-    }
-  }
-  let P = gTimes.length >= 3 ? estimatePeriod(env, efps) : 60 / 90;
-  P = refinePeriod(P, gTimes, gW);
-  let beats = gTimes.length >= 4 ? trackBeats(env, efps, P) : [];
-  if (beats.length < 2) {
-    beats = [gTimes[0]];
-  }
-  // période locale aux extrémités
-  const pStart = beats.length > 1 ? Math.min(P * 1.1, Math.max(P * 0.9, beats[1] - beats[0])) : P;
-  const pEnd = beats.length > 1 ? Math.min(P * 1.1, Math.max(P * 0.9, beats[beats.length - 1] - beats[beats.length - 2])) : P;
-  const first = cleaned[0].startSec;
-  while (beats[0] > first + 0.25 * pStart) beats.unshift(beats[0] - pStart);
-  while (beats.length > 1 && beats[1] <= first + 0.25 * pStart) beats.shift();
-  while (beats[beats.length - 1] < lastEnd + pEnd) beats.push(beats[beats.length - 1] + pEnd);
-  const ivals = [];
-  for (let i = 1; i < beats.length; i++) ivals.push(beats[i] - beats[i - 1]);
-  const tempo = Math.round(60 / median(ivals));
-
-  // accents par temps → mesure
-  const nb = beats.length;
-  const accVel = new Float64Array(nb), lowMidi = new Float64Array(nb).fill(Infinity), durB = new Float64Array(nb);
-  const nearestBeat = (t) => {
-    let lo = 0, hi = nb - 1;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (beats[mid] < t) lo = mid + 1;
-      else hi = mid;
-    }
-    if (lo > 0 && Math.abs(beats[lo - 1] - t) < Math.abs(beats[lo] - t)) lo--;
-    return lo;
-  };
+  const gList = [];
   for (const nt of cleaned) {
-    const j = nearestBeat(nt.startSec);
-    const pj = j + 1 < nb ? beats[j + 1] - beats[j] : P;
-    if (Math.abs(nt.startSec - beats[j]) > 0.2 * pj) continue;
-    accVel[j] = Math.max(accVel[j], nt.velocity / 127);
-    lowMidi[j] = Math.min(lowMidi[j], nt.midi);
-    durB[j] = Math.max(durB[j], (nt.endSec - nt.startSec) / pj);
+    const g = gList[gList.length - 1];
+    if (g && nt.startSec - g.t < 0.035) { g.w = Math.max(g.w, nt.velocity / 127); g.n++; g.low = Math.min(g.low, nt.midi); g.len = Math.max(g.len, nt.endSec - nt.startSec); }
+    else gList.push({ t: nt.startSec, w: nt.velocity / 127, n: 1, low: nt.midi, len: nt.endSec - nt.startSec });
   }
-  const acc = [];
-  for (let j = 0; j < nb; j++) {
-    const prevLow = j > 0 ? lowMidi[j - 1] : Infinity, nextLow = j + 1 < nb ? lowMidi[j + 1] : Infinity;
-    const bass = Number.isFinite(lowMidi[j]) && lowMidi[j] < prevLow && lowMidi[j] < nextLow && !isMono ? 1 : 0;
-    acc.push(accVel[j] + 0.8 * bass + (0.5 * Math.min(durB[j], 3)) / 3);
-  }
-  // on ignore les temps après la dernière attaque
-  let lastBeatWithNote = 0;
-  for (let j = 0; j < nb; j++) if (accVel[j] > 0) lastBeatWithNote = j;
-  // (la dernière attaque est exclue : sa durée, jusqu'à la fin du fichier, n'est pas significative)
-  const meter = estimateMeter(acc.slice(0, lastBeatWithNote));
-  const timeSig = [meter.num, 4];
-  const beatOffset = (meter.num - (meter.phase % meter.num)) % meter.num;
+  const rhythm = analyzeRhythm(gList, isMono, lastEnd);
+  let beats = rhythm.beatTimes;
+  const tempo = rhythm.tempo;
+  const timeSig = rhythm.timeSig;
+  const beatOffset = 0;
+  const meter = { scores: rhythm.scores };
 
   const key = estimateKey(cleaned.map((nt) => ({ midi: nt.midi, durSec: nt.endSec - nt.startSec, velocity: nt.velocity, startSec: nt.startSec })));
 
-  // confiance : alignement sur la grille + netteté de la hauteur
-  let onGrid = 0;
+  // confiance globale ≈ part des notes probablement justes : confiance moyenne des notes, pénalisée par les
+  // notes hors grille et, à deux mains, par les notes masquées que l'analyse ne peut pas voir
+  let onGrid = 0, confSum = 0, weak = 0;
   const bt = makeSecToBeat(beats, 0);
   for (const nt of cleaned) {
-    const b = bt(nt.startSec) * 4;
+    const b = bt(nt.startSec) / rhythm.grid;
     if (Math.abs(b - Math.round(b)) < 0.3) onGrid++;
+    confSum += nt.conf;
+    if (nt.conf < UNCERTAIN) weak++;
   }
-  let voiced = 0, clar = 0;
-  for (let i = 0; i < nY; i++) if (yinClar[i] > 0) { voiced++; clar += yinClar[i]; }
-  const pitchConf = voiced ? clar / voiced : 0.6;
-  const confidence = Math.round(100 * clamp(0.5 * (onGrid / cleaned.length) + 0.5 * pitchConf, 0, 1)) / 100;
-
+  const weakShare = weak / cleaned.length;
+  const offGrid = 1 - onGrid / cleaned.length;
+  const confidence = Math.round(100 * clamp((isMono ? 0.99 : 0.97) - 0.35 * weakShare - 0.5 * offGrid - 0.1 * (1 - rhythm.fit), 0.05, 0.99)) / 100;
   out.result = {
     notes: cleaned.map((nt) => ({
       midi: nt.midi,
@@ -934,6 +1111,7 @@ function* run(samples, sampleRate, opts, out) {
       durSec: round3(nt.endSec - nt.startSec),
       velocity: nt.velocity,
       hand: nt.hand,
+      confidence: Math.round(nt.conf * 100) / 100,
     })),
     tempo,
     beatTimes: beats.map(round3),
@@ -944,8 +1122,10 @@ function* run(samples, sampleRate, opts, out) {
     confidence,
     tuningCents: Math.round(tuningCents),
     duration,
-    grid: o.grid,
+    grid: opts.grid || rhythm.grid,
     meterScores: meter.scores,
+    polyphonic: !isMono,
+    rhythm: { tatum: round3(rhythm.tatum), fit: round3(rhythm.fit), margin: round3(rhythm.margin), alternatives: rhythm.alternatives },
   };
 }
 
@@ -1003,22 +1183,37 @@ export async function transcribeAsync(samples, sampleRate, opts = {}) {
 /**
  * Convertit le résultat en morceau « brut » (positions en temps), prêt pour prepareSong.
  * Les doigtés sont laissés vides : le doigté automatique les complète.
+ * Peut être rappelée autant de fois qu'on veut sur le même résultat (réglages rapides de l'import) :
+ * seule la mise en partition est refaite, pas l'analyse du son.
  * @param {ReturnType<typeof transcribe>} result
- * @param {{title?:string, composer?:string, grid?:number}} [opts]
+ * @param {{title?:string, composer?:string, grid?:number, tempoScale?:number, timeSig?:[number,number],
+ *   hands?:'both'|'melody', octave?:number, shift?:number}} [opts]
+ *   grid : pas de quantification en temps (0.5 croche, 0.25 double croche, 1/3 triolet ; défaut : celui choisi
+ *   par l'analyse) ; tempoScale : 2 = tempo et valeurs de notes doublés (une croche devient une noire),
+ *   0.5 = divisés par deux ; timeSig : mesure imposée ; hands : 'melody' ne garde que la
+ *   ligne de main droite ; octave : transposition (±1, ±2) ; shift : décalage du premier temps (en temps).
  */
-export function toRawSong(result, { title = 'Transcription', composer = 'Transcription automatique', grid } = {}) {
-  const g = grid || result.grid || 0.25;
-  const toBeat = makeSecToBeat(result.beatTimes, result.beatOffset || 0);
-  const q = (b) => Math.round(b / g) * g;
-  let notes = result.notes.map((nt) => {
-    const s = Math.max(0, q(toBeat(nt.startSec)));
+export function toRawSong(result, { title = 'Transcription', composer = 'Transcription automatique', grid, tempoScale = 1, timeSig, hands = 'both', octave = 0, shift = 0 } = {}) {
+  const scale = tempoScale > 0 ? tempoScale : 1;
+  const g = grid || clamp((result.grid || 0.25) * (scale >= 2 ? 2 : 1), 0.125, 0.5);
+  const base = makeSecToBeat(result.beatTimes, result.beatOffset || 0);
+  const toBeat = (t) => base(t) * scale + shift;
+  const q = (b) => Math.round(b / g + 1e-9) * g;
+  let src = result.notes;
+  if (hands === 'melody' && src.some((nt) => nt.hand !== 'L')) src = src.filter((nt) => nt.hand !== 'L');
+  let notes = src.map((nt) => {
+    const b = toBeat(nt.startSec);
+    const s = Math.max(0, q(b));
     const e = q(toBeat(nt.startSec + nt.durSec));
-    return { midi: nt.midi, start: s, dur: Math.max(g, e - s), hand: nt.hand === 'L' ? 'L' : 'R', finger: null, velocity: nt.velocity };
+    const out = { midi: clamp(nt.midi + 12 * Math.round(octave), 0, 127), start: s, dur: Math.max(g, e - s), hand: nt.hand === 'L' ? 'L' : 'R', finger: null, velocity: nt.velocity };
+    // incertaine : hauteur douteuse, ou attaque tombée entre deux positions de la grille
+    if ((nt.confidence != null && nt.confidence < UNCERTAIN) || Math.abs(b - q(b)) > 0.34 * g) out.uncertain = true;
+    return out;
   });
   // doublons (même note, même instant après quantification)
   const seen = new Map();
   for (const nt of notes) {
-    const k = `${nt.midi}@${nt.start}`;
+    const k = `${nt.midi}@${Math.round(nt.start * 1000)}`;
     const prev = seen.get(k);
     if (!prev || nt.dur > prev.dur) seen.set(k, nt);
   }
@@ -1035,13 +1230,23 @@ export function toRawSong(result, { title = 'Transcription', composer = 'Transcr
     }
   }
   const fix = (x) => Math.round(x * 1e6) / 1e6;
+  const uncertain = notes.filter((nt) => nt.uncertain).length;
   return {
     title,
     composer,
-    tempo: clamp(Math.round(result.tempo || 90), 30, 240),
-    timeSig: result.timeSig || [4, 4],
+    tempo: clamp(Math.round((result.tempo || 90) * scale), 30, 240),
+    timeSig: timeSig || result.timeSig || [4, 4],
     keyFifths: result.keyFifths || 0,
     notes: notes.map((nt) => ({ ...nt, start: fix(nt.start), dur: fix(nt.dur) })),
     transcribed: true,
+    transcription: {
+      confidence: result.confidence ?? 0,
+      uncertain,
+      grid: fix(g),
+      keyName: result.keyName,
+      tuningCents: result.tuningCents || 0,
+      duration: result.duration || 0,
+      polyphonic: !!result.polyphonic,
+    },
   };
 }

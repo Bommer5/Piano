@@ -1,0 +1,29 @@
+/* Page d'import : confiance de la transcription, écoute comparée, réglages rapides, notes incertaines. */
+.import-summary { margin: 8px 0; }
+.import-conf { margin: 8px 0 4px; }
+.import-conf-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.import-conf-head b { font-size: 1.35rem; }
+.import-conf-head.good b { color: var(--ok, #2e9e5b); }
+.import-conf-head.mid b { color: var(--warn, #d98a00); }
+.import-conf-head.low b { color: var(--bad, #d64545); }
+.import-conf .progress .fill.good { background: var(--ok, #2e9e5b); }
+.import-conf .progress .fill.mid { background: var(--warn, #d98a00); }
+.import-conf .progress .fill.low { background: var(--bad, #d64545); }
+.import-conf p { margin: 4px 0 0; }
+.uncertain-dot { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 50%; background: var(--warn, #d98a00); vertical-align: -0.05em; }
+.staff .note.uncertain { fill: var(--warn, #d98a00); stroke: var(--warn, #d98a00); }
+.staff .note.uncertain .accidental { stroke-width: inherit; }
+.import-listen { margin: 10px 0; }
+.import-listen .btn { flex: 1 1 150px; }
+.import-pager { justify-content: center; margin: 4px 0 12px; }
+.import-tune { margin: 12px 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card2); }
+.import-tune h4 { margin: 0 0 4px; }
+.import-tune > p { margin: 0 0 10px; }
+.import-tune-row { display: grid; grid-template-columns: 9.5em 1fr; gap: 6px 10px; align-items: center; margin: 8px 0; }
+.import-tune-label { font-weight: 650; font-size: 0.92rem; }
+.import-tune .seg { justify-self: start; }
+.import-warnings ul { margin: 4px 0 0; padding-left: 1.2em; }
+@media (max-width: 480px) {
+  .import-tune-row { grid-template-columns: 1fr; gap: 4px; }
+  .import-tune .seg-btn { padding: 6px 9px; }
+}

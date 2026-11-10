@@ -22,7 +22,7 @@ export const SUPPORTED_FORMATS = [
     description:
       'Enregistrement (MP3, WAV, OGG, M4A, FLAC, WebM ou enregistrement au micro) converti automatiquement en partition : ' +
       'notes, rythme, tempo, mesure et tonalité sont estimés. Fonctionne au mieux avec du piano seul ou une mélodie bien nette ' +
-      '(pas de chant, de batterie ni d’orchestre). Le résultat est une approximation : vérifie-le et corrige-le si besoin.',
+      '(pas de chant, de batterie ni d’orchestre). L’app indique sa confiance, signale les notes douteuses et te laisse comparer à l’oreille puis corriger.',
   },
 ];
 
@@ -194,9 +194,19 @@ export async function transcribeAudioBuffer(audio, sampleRate, opts = {}) {
   const res = await transcribeAsync(samples, sr, topts);
   if (!res.notes.length) throw new Error(NO_NOTE_AUDIO);
   const raw = toRawSong(res, { title: title || baseName(fileName) || 'Enregistrement', grid: opts.grid });
-  raw.transcription = { confidence: res.confidence, keyName: res.keyName, tuningCents: res.tuningCents, duration: res.duration };
   raw.source = { format: 'audio', fileName: fileName || null };
+  attachAnalysis(raw, res);
   return raw;
+}
+
+/**
+ * Garde le résultat complet de l'analyse à côté du morceau (propriété non énumérable : jamais enregistrée ni
+ * exportée). La page d'import s'en sert pour refaire la mise en partition (tempo ÷2, grille, mesure…) sans
+ * réanalyser le son : `toRawSong(song.analysis, réglages)`.
+ */
+function attachAnalysis(song, res) {
+  Object.defineProperty(song, 'analysis', { value: res, enumerable: false, configurable: true });
+  return song;
 }
 
 async function importAudio(u8, name, kind, opts) {
@@ -205,7 +215,7 @@ async function importAudio(u8, name, kind, opts) {
   delete raw.source;
   const song = finalize(raw, name, 'audio');
   song.transcribed = true;
-  return song;
+  return attachAnalysis(song, raw.analysis);
 }
 
 function sniffText(text) {
