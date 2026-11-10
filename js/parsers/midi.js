@@ -15,6 +15,7 @@
 // Export : format 1, 480 ticks par noire, piste 0 = tempo/mesure/armure, puis une piste par main.
 
 import { estimateKey } from '../core/notation.js';
+import { analyzePerformance, toRawSong } from '../core/transcribe.js';
 
 const r6 = (x) => Math.round(x * 1e6) / 1e6;
 
@@ -74,6 +75,7 @@ export function parseMidi(arrayBuffer) {
   const tracks = [];
   let tempo, timeSig, keyFifths, keyMode;
   const tempoEvents = [];
+  let drumNotes = 0;
   let chunkGuard = 0;
   while (p + 8 <= len && tracks.length < ntrks + 16 && chunkGuard++ < 100000) {
     const id = str4(p);
@@ -174,12 +176,24 @@ export function parseMidi(arrayBuffer) {
     }
     // Notes jamais relâchées : fermées en fin de piste.
     for (const [k, stack] of open) for (const _ of [...stack]) closeNote(k >> 7, k & 0x7f, tick);
+    drumNotes += track.notes.filter((n) => n.ch === 9).length;
     track.notes = track.notes.filter((n) => n.ch !== 9);
     tracks.push(track);
   }
   if (!tracks.length) throw midiError('aucune piste (MTrk) trouvée.');
 
-  const noteTracks = tracks.filter((t) => t.notes.length);
+  let noteTracks = tracks.filter((t) => t.notes.length);
+  const report = { details: [], warnings: [] };
+  if (drumNotes) report.warnings.push('Percussions (canal 10) ignorées.');
+  // Format 0 (ou une seule piste) avec plusieurs canaux : chaque canal compte comme une piste (une main).
+  if (noteTracks.length === 1) {
+    const chans = [...new Set(noteTracks[0].notes.map((n) => n.ch))].sort((a, b) => a - b);
+    if (chans.length > 1) {
+      noteTracks = chans.map((ch) => ({ name: null, notes: noteTracks[0].notes.filter((n) => n.ch === ch) }));
+      report.details.push(`${chans.length} canaux MIDI séparés`);
+    }
+  }
+  if (noteTracks.length > 2) report.warnings.push(`${noteTracks.length} pistes : la 1re va à la main droite, la 2e à la main gauche, les autres selon leur hauteur.`);
   const avg = (t) => t.notes.reduce((s, n) => s + n.midi, 0) / t.notes.length;
   const song = { notes: [] };
   // Titre : nom de la première piste si c'est la piste de tempo (format 1) ou un fichier format 0.
@@ -224,6 +238,9 @@ export function parseMidi(arrayBuffer) {
     }
   });
   song.notes.sort((a, b) => a.start - b.start || a.midi - b.midi);
+  if (song.tempoMap) report.details.push(`${song.tempoMap.length - 1} changement${song.tempoMap.length > 2 ? 's' : ''} de tempo`);
+  cleanLivePerformance(song, tempoEvents, division, report);
+  song.importReport = report;
   if (song.keyFifths === undefined && song.notes.length) {
     const k = estimateKey(song.notes);
     song.keyFifths = k.fifths;
@@ -231,6 +248,51 @@ export function parseMidi(arrayBuffer) {
     song.keyEstimated = true;
   }
   return song;
+}
+
+/**
+ * MIDI joué en direct (notes à côté de la grille) : remet le rythme au propre.
+ *  - notes presque sur la grille (enregistré au métronome) : simple recalage sur la double croche ;
+ *  - notes sans rapport avec la grille du fichier (joué librement) : tempo, mesure et premier temps sont
+ *    retrouvés à l'oreille, comme pour un enregistrement audio (analyzePerformance).
+ * Un fichier écrit proprement (éditeur de partitions, séquenceur quantifié) n'est jamais modifié.
+ */
+function cleanLivePerformance(song, tempoEvents, division, report) {
+  const notes = song.notes;
+  if (notes.length < 8) return;
+  const off = (x, g) => Math.abs(x / g - Math.round(x / g)) * g;
+  const fine = (x) => Math.min(off(x, 0.125), off(x, 1 / 12));
+  const exact = notes.filter((n) => fine(n.start) < 0.012).length / notes.length;
+  if (exact >= 0.9) return;
+  const mean16 = notes.reduce((s, n) => s + off(n.start, 0.25), 0) / notes.length;
+  if (mean16 < 0.045) {
+    const g = 0.25;
+    const q = (x) => Math.round(x / g) * g;
+    for (const n of notes) {
+      const st = q(n.start);
+      n.dur = r6(Math.max(g, q(n.start + n.dur) - st));
+      n.start = r6(st);
+    }
+    notes.sort((a, b) => a.start - b.start || a.midi - b.midi);
+    report.details.push('joué en direct : notes replacées sur la grille (doubles croches)');
+    return;
+  }
+  // temps (noires du fichier) → secondes, en suivant les changements de tempo
+  const tm = tempoEvents.map((t) => ({ beat: t.tick / division, bpm: t.bpm })).sort((a, b) => a.beat - b.beat);
+  if (!tm.length || tm[0].beat > 0) tm.unshift({ beat: 0, bpm: tm.length ? tm[0].bpm : 120 });
+  let acc = 0;
+  for (let k = 0; k < tm.length; k++) { tm[k].sec = acc; if (k + 1 < tm.length) acc += ((tm[k + 1].beat - tm[k].beat) * 60) / tm[k].bpm; }
+  const toSec = (b) => { let k = tm.length - 1; while (k > 0 && tm[k].beat > b) k--; return tm[k].sec + ((b - tm[k].beat) * 60) / tm[k].bpm; };
+  const res = analyzePerformance(notes.map((n) => ({ midi: n.midi, startSec: toSec(n.start), durSec: toSec(n.start + n.dur) - toSec(n.start), velocity: n.velocity, hand: n.hand })));
+  const raw = toRawSong(res, {});
+  if (!raw.notes.length) return;
+  song.notes = raw.notes.map(({ uncertain, ...n }) => n);
+  song.tempo = raw.tempo;
+  song.timeSig = raw.timeSig;
+  delete song.tempoMap;
+  if (song.keyFifths === undefined) { song.keyFifths = raw.keyFifths; song.keyEstimated = true; }
+  report.details.push(`joué en direct sans métronome : rythme remis au propre (♩ = ${raw.tempo}, ${raw.timeSig.join('/')})`);
+  report.warnings.push('Ce MIDI a été joué librement : le tempo et la mesure ont été estimés. Vérifie le début des mesures.');
 }
 
 // ---------------------------------------------------------------------------

@@ -1181,6 +1181,34 @@ export async function transcribeAsync(samples, sampleRate, opts = {}) {
 }
 
 /**
+ * Analyse rythmique d'une interprétation déjà connue note par note (fichier MIDI joué en direct, sans
+ * métronome) : retrouve tempo, mesure, premier temps et grille, comme pour un enregistrement audio.
+ * Le résultat se passe à `toRawSong` (les mains fournies sont conservées).
+ * @param {Array<{midi:number,startSec:number,durSec:number,velocity?:number,hand?:'R'|'L'}>} played
+ */
+export function analyzePerformance(played) {
+  const notes = played.filter((n) => n.durSec > 0).map((n) => ({ velocity: 80, hand: 'R', ...n })).sort((a, b) => a.startSec - b.startSec || a.midi - b.midi);
+  if (!notes.length) return emptyResult();
+  const gList = [];
+  let poly = 0;
+  for (const nt of notes) {
+    const g = gList[gList.length - 1];
+    if (g && nt.startSec - g.t < 0.04) { g.w = Math.max(g.w, nt.velocity / 127); if (g.n++ === 1) poly++; g.low = Math.min(g.low, nt.midi); g.len = Math.max(g.len, nt.durSec); }
+    else gList.push({ t: nt.startSec, w: nt.velocity / 127, n: 1, low: nt.midi, len: nt.durSec });
+  }
+  const isMono = poly <= gList.length * 0.1;
+  const lastEnd = Math.max(...notes.map((n) => n.startSec + n.durSec));
+  const rhythm = analyzeRhythm(gList, isMono, lastEnd);
+  const key = estimateKey(notes);
+  return {
+    notes: notes.map((n) => ({ midi: n.midi, startSec: n.startSec, durSec: n.durSec, velocity: n.velocity, hand: n.hand, confidence: 1 })),
+    tempo: rhythm.tempo, beatTimes: rhythm.beatTimes, beatOffset: 0, keyFifths: key.keyFifths, keyName: key.name, timeSig: rhythm.timeSig,
+    confidence: Math.round(100 * clamp(0.75 + 0.25 * rhythm.fit, 0, 1)) / 100, tuningCents: 0, duration: lastEnd, grid: rhythm.grid, polyphonic: !isMono,
+    rhythm: { tatum: round3(rhythm.tatum), fit: round3(rhythm.fit), margin: round3(rhythm.margin), alternatives: rhythm.alternatives },
+  };
+}
+
+/**
  * Convertit le résultat en morceau « brut » (positions en temps), prêt pour prepareSong.
  * Les doigtés sont laissés vides : le doigté automatique les complète.
  * Peut être rappelée autant de fois qu'on veut sur le même résultat (réglages rapides de l'import) :

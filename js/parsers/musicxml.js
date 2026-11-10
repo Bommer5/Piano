@@ -13,8 +13,12 @@
 //   nuances et soufflets (<dynamics>/<wedge> → song.dynamics), pédale (<pedal> → song.pedal),
 //   liaisons de phrasé (<slur> → note.slur), articulations (staccato, accent, tenuto…),
 //   changements de tempo (→ song.tempoMap [{beat, bpm}]), levée (→ song.pickupBeats).
-// Non pris en charge (volontairement) : les reprises / voltas / D.C. / D.S. sont ignorées, la
-// partition est lue linéairement telle qu'écrite. score-timewise est refusé avec un message clair.
+//   Reprises, fins alternatives (voltas), D.C. / D.S. / Fine / Coda : DÉPLIÉES (le morceau obtenu se joue
+//   d'un bout à l'autre comme on l'entend). Plusieurs parties : si l'une est un piano (deux portées ou nom
+//   « Piano »), elle seule est importée. Changements de mesure / d'armure en cours de morceau : les notes
+//   restent exactes, la mesure et l'armure du début sont gardées (signalé dans song.importReport).
+//   song.importReport = { details:[…], warnings:[…] } résume ce qui a été compris.
+// Non pris en charge : score-timewise (refusé avec un message clair).
 //
 // Export : une partie piano à deux portées (clé de sol / clé de fa), voix séparées par <backup>,
 // notes coupées aux barres de mesure avec liaisons, doigtés inclus.
@@ -105,8 +109,29 @@ export function parseMusicXML(text) {
     if (comp && comp.text().trim()) song.composer = comp.text().trim();
   }
 
-  const parts = root.children('part');
+  let parts = root.children('part');
   if (!parts.length) throw new Error('Partition MusicXML vide : aucune partie (<part>) trouvée.');
+  const report = { details: [], warnings: [] };
+  const stat = { lyrics: false, voices: false, grace: 0, timeChanges: 0, keyChanges: 0, unfolded: null, writtenMeasures: 0 };
+  // Plusieurs parties dont un piano : on ne garde que le piano (la voix ou le violon doubleraient la mélodie).
+  if (parts.length > 1) {
+    const names = new Map();
+    for (const sp of root.descendants('score-part')) names.set(sp.attr('id'), (sp.childText('part-name') || '').trim());
+    const isPiano = (part) => {
+      const nm = names.get(part.attr('id')) || '';
+      if (/piano|klavier|clavier|keyboard|pianoforte|clavecin|orgue|organ/i.test(nm)) return true;
+      for (const st of part.descendants('staves')) if (num(st.text(), 1) > 1) return true;
+      return false;
+    };
+    const pianos = parts.filter(isPiano);
+    if (pianos.length && pianos.length < parts.length) {
+      const dropped = parts.filter((x) => x !== pianos[0]).map((x) => names.get(x.attr('id')) || 'sans nom');
+      report.warnings.push(`Seule la partie de piano est importée ; parties ignorées : ${dropped.join(', ')}.`);
+      parts = [pianos[0]];
+    } else if (parts.length > 2) {
+      report.warnings.push(`${parts.length} parties : la première va à la main droite, les autres à la main gauche.`);
+    }
+  }
 
   // Nombre de portées par partie (pour l'attribution des mains).
   const stavesOf = parts.map((p) => {
@@ -129,11 +154,13 @@ export function parseMusicXML(text) {
       return 'R';
     };
     let divisions = 1;
+    let lastFifths = song.keyFifths;
     let timeSig = song.timeSig || [4, 4];
     let measureStart = 0;
-    const openTies = new Map(); // midi -> note en attente de prolongation
     const partNotes = [];
     const partMarks = []; // accords, nuances, pédale, tempo de cette partie (décalés avec la levée)
+    const recs = []; // une fiche par mesure écrite : notes, marques, reprises, voltas, renvois
+    let endingOpen = null;
     const openWedges = [];
     let pickupShift = 0;
 
@@ -141,6 +168,17 @@ export function parseMusicXML(text) {
       let pos = 0;
       let maxPos = 0;
       let lastStart = 0;
+      const rec = { start: measureStart, len: 0, notes: [], marks: [], ending: endingOpen };
+      recs.push(rec);
+      const voicesByStaff = new Map();
+      const soundFlags = (snd) => {
+        if (snd.attr('dacapo') === 'yes') rec.dacapo = true;
+        if (snd.attr('dalsegno')) rec.dalsegno = true;
+        if (snd.attr('segno')) rec.segno = true;
+        if (snd.attr('coda')) rec.coda = true;
+        if (snd.attr('tocoda')) rec.tocoda = true;
+        if (snd.attr('fine')) rec.fine = true;
+      };
 
       for (const el of measure.children()) {
         switch (el.name) {
@@ -152,15 +190,21 @@ export function parseMusicXML(text) {
               const beats = String(time.childText('beats', '')).split('+').reduce((a, b) => a + (num(b, 0) || 0), 0);
               const bt = num(time.childText('beat-type'));
               if (beats > 0 && bt > 0) {
+                if (pIdx === 0 && song.timeSig && (beats !== timeSig[0] || bt !== timeSig[1])) stat.timeChanges++;
                 timeSig = [beats, bt];
                 if (!song.timeSig) song.timeSig = [beats, bt];
               } else if (time.attr('symbol') === 'common' && !song.timeSig) song.timeSig = timeSig = [4, 4];
             }
             const key = el.child('key');
+            if (key && song.keyFifths !== undefined && pIdx === 0 && mIdx > 0) {
+              const f = num(key.childText('fifths'));
+              if (f != null && Math.round(f) !== lastFifths) { stat.keyChanges++; lastFifths = Math.round(f); }
+            }
             if (key && song.keyFifths === undefined) {
               const f = num(key.childText('fifths'));
               if (f != null) {
                 song.keyFifths = Math.max(-7, Math.min(7, Math.round(f)));
+                lastFifths = Math.round(f);
                 const mode = (key.childText('mode') || '').toLowerCase();
                 if (mode === 'minor' || mode === 'aeolian') song.keyMode = 'minor';
                 else if (mode === 'major' || mode === 'ionian') song.keyMode = 'major';
@@ -184,18 +228,40 @@ export function parseMusicXML(text) {
               degrees: el.children('degree').map((d) => ({ value: d.childText('degree-value'), alter: num(d.childText('degree-alter'), 0), type: d.childText('degree-type') })),
             });
             const off = (num(el.childText('offset'), 0) || 0) / divisions;
-            if (symbol) partMarks.push({ list: chords, item: { beat: measureStart + pos + off, symbol } });
+            if (symbol) rec.marks.push({ list: chords, item: { beat: measureStart + pos + off, symbol } });
+            break;
+          }
+          case 'barline': {
+            const rp = el.child('repeat');
+            if (rp) {
+              if (rp.attr('direction') === 'forward') rec.repeatStart = true;
+              else if (rp.attr('direction') === 'backward') { rec.repeatEnd = true; rec.times = Math.max(2, Math.round(num(rp.attr('times'), 2))); }
+            }
+            const en = el.child('ending');
+            if (en) {
+              const type = en.attr('type');
+              if (type === 'start') {
+                const nums = String(en.attr('number') || '1').split(/[,\s]+/).map((x) => parseInt(x, 10)).filter((x) => x > 0);
+                endingOpen = nums.length ? nums : [1];
+                rec.ending = endingOpen;
+              } else if (type === 'stop' || type === 'discontinue') endingOpen = null;
+            }
             break;
           }
           case 'direction':
           case 'sound': {
+            for (const snd of el.name === 'sound' ? [el] : el.descendants('sound')) soundFlags(snd);
+            if (el.name === 'direction') {
+              if (el.descendants('segno').length) rec.segno = true;
+              if (el.descendants('coda').length && !rec.tocoda) rec.codaSign = true;
+            }
             const off = el.name === 'direction' ? (num(el.childText('offset'), 0) || 0) / divisions : 0;
             const at = measureStart + pos + off;
             if (el.name === 'direction') {
               for (const dyn of el.descendants('dynamics')) {
                 for (const m of dyn.children()) {
                   const mark = m.name === 'other-dynamics' ? m.text().trim() : m.name;
-                  if (DYNAMIC_MARKS.includes(mark)) partMarks.push({ list: dynamics, item: { beat: at, mark } });
+                  if (DYNAMIC_MARKS.includes(mark)) rec.marks.push({ list: dynamics, item: { beat: at, mark } });
                 }
               }
               for (const w of el.descendants('wedge')) {
@@ -203,16 +269,16 @@ export function parseMusicXML(text) {
                 if (type === 'crescendo' || type === 'diminuendo') {
                   const item = { beat: at, mark: type === 'crescendo' ? 'cresc' : 'dim', end: at + 1 };
                   openWedges.push(item);
-                  partMarks.push({ list: dynamics, item });
+                  rec.marks.push({ list: dynamics, item });
                 } else if (type === 'stop' && openWedges.length) openWedges.shift().end = at;
               }
               for (const pd of el.descendants('pedal')) {
                 const type = pd.attr('type');
-                if (type === 'start') partMarks.push({ list: pedal, item: { beat: at, down: true } });
-                else if (type === 'stop') partMarks.push({ list: pedal, item: { beat: at, down: false } });
+                if (type === 'start') rec.marks.push({ list: pedal, item: { beat: at, down: true } });
+                else if (type === 'stop') rec.marks.push({ list: pedal, item: { beat: at, down: false } });
                 else if (type === 'change') {
-                  partMarks.push({ list: pedal, item: { beat: at, down: false } });
-                  partMarks.push({ list: pedal, item: { beat: at, down: true } });
+                  rec.marks.push({ list: pedal, item: { beat: at, down: false } });
+                  rec.marks.push({ list: pedal, item: { beat: at, down: true } });
                 }
               }
             }
@@ -232,7 +298,7 @@ export function parseMusicXML(text) {
                   break;
                 }
               }
-              if (bpmHere != null) partMarks.push({ list: tempoMap, item: { beat: at, bpm: bpmHere } });
+              if (bpmHere != null) rec.marks.push({ list: tempoMap, item: { beat: at, bpm: bpmHere } });
             }
             if (song.tempo === undefined) {
               const sounds = el.name === 'sound' ? [el] : el.descendants('sound');
@@ -266,7 +332,8 @@ export function parseMusicXML(text) {
             break;
           }
           case 'note': {
-            if (el.child('grace') || el.child('cue')) break; // notes d'ornement : ignorées
+            if (el.child('grace') || el.child('cue')) { if (el.child('grace')) stat.grace++; break; } // notes d'ornement : ignorées
+            if (el.child('lyric')) stat.lyrics = true;
             const isChord = !!el.child('chord');
             let dur = num(el.childText('duration'));
             dur = dur != null && dur >= 0 ? dur / divisions : durationFromType(el) || 0;
@@ -288,6 +355,12 @@ export function parseMusicXML(text) {
             if (midi < 0 || midi > 127) break;
             const staff = num(el.childText('staff'), 1);
             const hand = handFor(staff);
+            {
+              const v = el.childText('voice') || '1';
+              if (!voicesByStaff.has(staff)) voicesByStaff.set(staff, new Set());
+              voicesByStaff.get(staff).add(v);
+              if (voicesByStaff.get(staff).size > 1) stat.voices = true;
+            }
             // notation : liaisons de phrasé et articulations
             let slur = null;
             for (const sl of el.descendants('slur')) {
@@ -309,21 +382,14 @@ export function parseMusicXML(text) {
             const tieTypes = new Set(el.children('tie').map((t) => t.attr('type')));
             for (const t of el.descendants('tied')) tieTypes.add(t.attr('type'));
             const absStart = measureStart + start;
-            const prev = openTies.get(midi);
-            if (tieTypes.has('stop') && prev && Math.abs(prev.start + prev.dur - absStart) < 1e-3) {
-              prev.dur = absStart + dur - prev.start;
-              if (!prev.finger && finger) prev.finger = finger;
-              if (slur) prev.slur = prev.slur && prev.slur !== slur ? 'both' : slur;
-              if (!tieTypes.has('start')) openTies.delete(midi);
-              break;
-            }
             const n = { midi, start: absStart, dur, hand, finger, spelling: { step, alter } };
             if (stavesOf[pIdx] > 1) n.staff = staff >= 2 ? 2 : 1;
             if (slur) n.slur = slur;
             if (articulations.length) n.articulations = articulations;
-            partNotes.push(n);
-            if (tieTypes.has('start')) openTies.set(midi, n);
-            else openTies.delete(midi);
+            // liaisons de prolongation : fusionnées après le dépliage des reprises
+            n._tieStop = tieTypes.has('stop');
+            n._tieStart = tieTypes.has('start');
+            rec.notes.push(n);
             break;
           }
           default:
@@ -338,8 +404,46 @@ export function parseMusicXML(text) {
         len = maxPos;
         if (pIdx === 0 || song.pickupBeats === undefined) song.pickupBeats = r6(maxPos);
       }
+      rec.len = len;
       measureStart += len;
     });
+
+    // --- ordre de jeu : reprises, voltas, D.C. / D.S. / Fine / Coda dépliés ---
+    const order = playOrder(recs);
+    if (pIdx === 0) {
+      stat.writtenMeasures = recs.length;
+      stat.unfolded = order.unfolded ? order : null;
+    }
+    {
+      const openTies = new Map(); // midi -> note en attente de prolongation
+      let at = 0;
+      for (const idx of order.list) {
+        const rec = recs[idx];
+        const delta = at - rec.start;
+        for (const src of rec.notes) {
+          const { _tieStop, _tieStart, ...copy } = src;
+          copy.start = src.start + delta;
+          if (src.spelling) copy.spelling = { ...src.spelling };
+          const prev = openTies.get(copy.midi);
+          if (_tieStop && prev && Math.abs(prev.start + prev.dur - copy.start) < 1e-3) {
+            prev.dur = copy.start + copy.dur - prev.start;
+            if (!prev.finger && copy.finger) prev.finger = copy.finger;
+            if (copy.slur) prev.slur = prev.slur && prev.slur !== copy.slur ? 'both' : copy.slur;
+            if (!_tieStart) openTies.delete(copy.midi);
+            continue;
+          }
+          partNotes.push(copy);
+          if (_tieStart) openTies.set(copy.midi, copy);
+          else openTies.delete(copy.midi);
+        }
+        for (const { list, item } of rec.marks) {
+          const it = { ...item, beat: item.beat + delta };
+          if (item.end !== undefined) it.end = item.end + delta;
+          partMarks.push({ list, item: it });
+        }
+        at += rec.len;
+      }
+    }
 
     for (const n of partNotes) {
       n.start = r6(n.start + pickupShift);
@@ -385,7 +489,74 @@ export function parseMusicXML(text) {
   }
 
   song.notes.sort((a, b) => a.start - b.start || a.midi - b.midi);
+  // --- compte rendu de l'import ---
+  if (stat.unfolded) {
+    const u = stat.unfolded;
+    const what = [u.repeats ? 'reprises' : null, u.voltas ? 'fins alternatives' : null, u.jumps ? 'renvois (D.C., D.S., Coda)' : null].filter(Boolean).join(', ');
+    report.details.push(`${what} dépliés : ${stat.writtenMeasures} mesures écrites → ${u.list.length} jouées`);
+  }
+  if (song.tempoMap) report.details.push(`${song.tempoMap.length - 1} changement${song.tempoMap.length > 2 ? 's' : ''} de tempo`);
+  if (song.pickupBeats) report.details.push('levée');
+  if (stat.voices) report.details.push('plusieurs voix par portée fusionnées');
+  if (stat.timeChanges) report.warnings.push(`${stat.timeChanges} changement${stat.timeChanges > 1 ? 's' : ''} de mesure en cours de morceau : les notes sont justes, mais les barres de mesure affichées suivent la mesure du début (${song.timeSig.join('/')}).`);
+  if (stat.keyChanges) report.warnings.push(`${stat.keyChanges} changement${stat.keyChanges > 1 ? 's' : ''} d’armure en cours de morceau : l’armure du début est gardée, les altérations sont écrites devant les notes.`);
+  if (stat.lyrics) report.warnings.push('Paroles ignorées.');
+  if (stat.grace) report.warnings.push(`${stat.grace} petite${stat.grace > 1 ? 's' : ''} note${stat.grace > 1 ? 's' : ''} d’ornement ignorée${stat.grace > 1 ? 's' : ''}.`);
+  song.importReport = report;
   return clean(song);
+}
+
+/**
+ * Ordre de jeu des mesures : déplie les reprises (|: :|, « times »), les fins alternatives (voltas 1., 2.…)
+ * et les renvois (D.C., D.S., al Fine, al Coda). Après un renvoi, les reprises ne sont plus refaites et
+ * l'on passe directement à la dernière fin.
+ * @param {Array<object>} recs fiches de mesure ({repeatStart, repeatEnd, times, ending:[n…], dacapo, dalsegno, segno, coda, tocoda, fine})
+ * @returns {{list:number[], unfolded:boolean, repeats:boolean, voltas:boolean, jumps:boolean}}
+ */
+export function playOrder(recs) {
+  const n = recs.length;
+  const res = { list: [], unfolded: false, repeats: false, voltas: false, jumps: false };
+  const segno = recs.findIndex((r) => r.segno);
+  let coda = recs.findIndex((r) => r.coda);
+  if (coda < 0) { const signs = recs.map((r, i) => (r.codaSign ? i : -1)).filter((i) => i >= 0); if (signs.length > 1) coda = signs[signs.length - 1]; }
+  // dernière volta d'un groupe : celle qui ne se termine pas par une reprise
+  const lastVolta = (i) => { let k = i; while (k + 1 < n && recs[k + 1].ending === recs[i].ending) k++; return !recs[k].repeatEnd; };
+  let i = 0, start = 0, pass = 1, jumped = false, guard = 0;
+  const done = new Map(); // mesure de fin de reprise → nombre de retours déjà faits
+  while (i < n && guard++ < 20000) {
+    const r = recs[i];
+    if (r.repeatStart && start !== i) { start = i; pass = 1; }
+    if (r.ending) {
+      const take = jumped ? lastVolta(i) : r.ending.includes(pass) || (lastVolta(i) && pass > Math.max(...r.ending));
+      if (!take) { res.voltas = res.unfolded = true; i++; continue; }
+    }
+    res.list.push(i);
+    if (jumped && r.fine) break;
+    if (jumped && (r.tocoda || (r.codaSign && coda > i)) && coda > i) { i = coda; continue; }
+    if (r.repeatEnd && !jumped) {
+      const times = r.ending ? Math.max(...r.ending) + 1 : r.times || 2;
+      const c = done.get(i) || 0;
+      if (c < times - 1) {
+        done.set(i, c + 1);
+        pass++;
+        res.repeats = res.unfolded = true;
+        i = start;
+        continue;
+      }
+      done.delete(i);
+      pass = 1;
+      start = i + 1;
+    }
+    if (!jumped && (r.dacapo || (r.dalsegno && segno >= 0))) {
+      jumped = true;
+      res.jumps = res.unfolded = true;
+      i = r.dacapo ? 0 : segno;
+      continue;
+    }
+    i++;
+  }
+  if (res.list.length > 4000) res.list.length = 4000;
+  return res;
 }
 
 // ---------------------------------------------------------------------------

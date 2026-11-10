@@ -456,9 +456,19 @@ export function parseABC(text) {
       }
       if (c === '|' || c === ':' || (c === '[' && /[|\d]/.test(line[i + 1] || '') )) {
         // barres, reprises, fins alternatives (|1 :|2 [1 [2 …)
+        const tok0 = i;
         while (i < n && /[|:\[\]]/.test(line[i])) i++;
+        const bars = line.slice(tok0, i);
+        const num0 = i;
         while (i < n && (/\d/.test(line[i]) || (/[,\-]/.test(line[i]) && /\d/.test(line[i + 1] || '')))) i++;
         onBar();
+        {
+          // reprises et fins alternatives : notées ici, dépliées à la fin
+          const v = curVoice();
+          const ending = parseInt(line.slice(num0, i), 10);
+          const mk = { t: v.time, end: /^:/.test(bars) || /:\|/.test(bars), start: /:$/.test(bars) || /\|:/.test(bars) || bars === '::', ending: ending > 0 ? ending : 0 };
+          if (mk.end || mk.start || mk.ending) (v.marks || (v.marks = [])).push(mk);
+        }
         continue;
       }
       if (c === ']') {
@@ -581,6 +591,44 @@ export function parseABC(text) {
   // --- Mains ---
   const used = voiceOrder.map((id) => voices.get(id)).filter((v) => v.notes.length);
   if (!used.length) throw abcError('aucune note trouvée.');
+  // --- Reprises |: :| et fins alternatives [1 [2 : dépliées (structure lue sur la première voix qui en a) ---
+  const report = { details: [], warnings: [] };
+  {
+    const ref = used.find((v) => (v.marks || []).some((m) => m.end));
+    const ops = [];
+    if (ref) {
+      let seg = 0, volta = null;
+      for (const m of ref.marks) {
+        if (m.end) {
+          const b = volta != null ? volta : m.t;
+          if (b > seg + 1e-9) ops.push({ a: seg, b, at: m.t, len: b - seg });
+          seg = m.t; volta = null;
+        } else if (m.ending === 1) volta = m.t;
+        if (m.start) { seg = m.t; volta = null; }
+      }
+    }
+    if (ops.length) {
+      let acc = 0;
+      for (const o of ops) { o.off = acc; acc += o.len; }
+      const shift = (x) => x + ops.reduce((t, o) => t + (o.at <= x + 1e-9 ? o.len : 0), 0);
+      const unfold = (items, key, dup = true) => {
+        const out = [];
+        for (const it of items) {
+          const x = it[key];
+          out.push({ ...it, [key]: shift(x) });
+          if (dup) for (const o of ops) if (x >= o.a - 1e-9 && x < o.b - 1e-9) out.push({ ...it, [key]: o.at + o.off + (x - o.a) });
+        }
+        return out;
+      };
+      for (const v of used) v.notes = unfold(v.notes, 'start');
+      chordMarks.splice(0, chordMarks.length, ...unfold(chordMarks, 'beat'));
+      dynMarks.splice(0, dynMarks.length, ...unfold(dynMarks, 'beat', false));
+      tempoMarks.splice(0, tempoMarks.length, ...unfold(tempoMarks, 'beat', false));
+      report.details.push(ref.marks.some((m) => m.ending) ? 'reprises et fins alternatives dépliées' : 'reprises dépliées');
+    }
+    if (used.length > 2) report.warnings.push(`${used.length} voix : la première va à la main droite, les autres sont réparties selon leur hauteur.`);
+  }
+  song.importReport = report;
   used.forEach((v, idx) => {
     let hand;
     if (used.length === 1) hand = 'R';

@@ -128,8 +128,11 @@ test('musicxml : métadonnées, levée, backup, accords, liaisons, ornements, do
   assert.deepEqual(s.timeSig, [3, 4]);
   assert.equal(s.keyFifths, -1);
   assert.equal(s.tempo, 90); // noire pointée = 60 → 90 noires/min
-  // levée d'un temps en 3/4 : décalage de 2 temps
-  assert.deepEqual(simple(s.notes), [
+  // levée d'un temps en 3/4 : décalage de 2 temps ; la reprise finale est dépliée (tout est joué deux fois)
+  assert.equal(s.notes.length, 18);
+  assert.deepEqual(simple(s.notes.slice(9)), simple(s.notes.slice(0, 9)).map(([m, st, d, h]) => [m, st + 7, d, h]));
+  assert.match(s.importReport.details.join(' '), /reprises dépliés : 3 mesures écrites → 6 jouées/);
+  assert.deepEqual(simple(s.notes.slice(0, 9)), [
     [72, 2, 1, 'R'],
     [53, 3, 3, 'L'],
     [57, 3, 3, 'L'],
@@ -144,7 +147,7 @@ test('musicxml : métadonnées, levée, backup, accords, liaisons, ornements, do
   assert.equal(s.notes.find((n) => n.midi === 70).finger, 4);
   assert.equal(s.notes.find((n) => n.midi === 69).finger, null);
   const p = prep(s);
-  assert.equal(p.measureCount, 3);
+  assert.equal(p.measureCount, 6);
 });
 
 test('musicxml : tempo via <sound>, plusieurs parties à une portée, titre de mouvement', () => {
@@ -306,15 +309,15 @@ test('mxl : archive deflate avec META-INF/container.xml', async () => {
   ]);
   const s = await parseMXL(zip.buffer);
   assert.equal(s.title, 'Petite pièce & test');
-  assert.equal(s.notes.length, 9);
+  assert.equal(s.notes.length, 18);
   prep(s);
 });
 
 test('mxl : méthode « stockée », sans container.xml, et sans répertoire central', async () => {
   const stored = await buildZip([['piece.xml', MXML]], { method: 0 });
-  assert.equal((await parseMXL(stored)).notes.length, 9);
+  assert.equal((await parseMXL(stored)).notes.length, 18);
   const noCentral = await buildZip([['META-INF/x.xml', '<a/>'], ['piece.musicxml', MXML]], { central: false });
-  assert.equal((await parseMXL(noCentral)).notes.length, 9);
+  assert.equal((await parseMXL(noCentral)).notes.length, 18);
 });
 
 test('mxl : erreurs claires', async () => {
@@ -553,7 +556,7 @@ test('abc : n-olets (p:q:r) et mesure composée', () => {
   );
 });
 
-test('abc : voix multiples (V:1 → MD, V:2 → MG), reprises et fins alternatives lues linéairement', () => {
+test('abc : voix multiples (V:1 → MD, V:2 → MG), reprises et fins alternatives dépliées', () => {
   const s = parseABC(`X:1
 T:Deux voix
 M:3/4
@@ -562,7 +565,7 @@ V:1 clef=treble
 V:2 clef=bass
 K:F
 V:1
-|: c d e :|1 f3 :|2 g3 |]
+|: c d e |1 f3 :|2 g3 |]
 V:2
 [V:2] F,3 | C,3 | B,,3 |]
 X:2
@@ -577,10 +580,15 @@ CDE`);
     [74, 1, 1, 'R'],
     [76, 2, 1, 'R'],
     [48, 3, 3, 'L'],
-    [77, 3, 3, 'R'],
-    [46, 6, 3, 'L'], // B,, (Si1) avec si bémol de l'armure (Fa majeur)
-    [79, 6, 3, 'R'],
+    [77, 3, 3, 'R'], // 1re fin
+    [53, 6, 3, 'L'], // reprise (la structure de la voix 1 s'applique à la voix 2)
+    [72, 6, 1, 'R'],
+    [74, 7, 1, 'R'],
+    [76, 8, 1, 'R'],
+    [46, 9, 3, 'L'], // B,, (Si1) avec si bémol de l'armure (Fa majeur)
+    [79, 9, 3, 'R'], // 2e fin
   ]);
+  assert.deepEqual(s.importReport.details, ['reprises et fins alternatives dépliées']);
   prep(s);
 });
 
@@ -724,4 +732,186 @@ test('samples/ : chaque fichier d’exemple s’importe', async () => {
     const p = prep(s);
     assert.ok(p.hands.R && p.hands.L, name);
   }
+});
+
+// ---------------------------------------------------------------------------
+// Fichiers « comme exportés » par MuseScore / un séquenceur : reprises, voltas, voix, parties, MIDI joué
+// ---------------------------------------------------------------------------
+
+const xn = (step, oct, dur, extra = '') => `<note><pitch><step>${step}</step><octave>${oct}</octave></pitch><duration>${dur}</duration>${extra}</note>`;
+const xchord = (step, oct, dur, extra = '') => `<note><chord/><pitch><step>${step}</step><octave>${oct}</octave></pitch><duration>${dur}</duration>${extra}</note>`;
+
+test('musicxml (MuseScore) : voix + piano, 2 voix par portée, accords, liaison, triolet, levée, reprise avec voltas, nuances, paroles', () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <work><work-title>Chanson</work-title></work>
+  <part-list>
+    <score-part id="P1"><part-name>Voix</part-name></score-part>
+    <score-part id="P2"><part-name>Piano</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="0" implicit="yes"><attributes><divisions>6</divisions><key><fifths>1</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      ${xn('D', 5, 6, '<lyric><text>La</text></lyric>')}</measure>
+    <measure number="1">${xn('G', 5, 24)}</measure>
+  </part>
+  <part id="P2">
+    <measure number="0" implicit="yes">
+      <attributes><divisions>6</divisions><key><fifths>1</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time><staves>2</staves>
+        <clef number="1"><sign>G</sign><line>2</line></clef><clef number="2"><sign>F</sign><line>4</line></clef></attributes>
+      <direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>96</per-minute></metronome></direction-type><sound tempo="96"/></direction>
+      <direction placement="below"><direction-type><dynamics><mf/></dynamics></direction-type><staff>1</staff></direction>
+      ${xn('D', 4, 6, '<voice>1</voice><type>quarter</type><staff>1</staff>')}
+    </measure>
+    <measure number="1">
+      <barline location="left"><repeat direction="forward"/></barline>
+      ${xn('G', 4, 12, '<voice>1</voice><staff>1</staff>')}
+      ${xn('A', 4, 2, '<voice>1</voice><time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification><staff>1</staff>')}
+      ${xn('B', 4, 2, '<voice>1</voice><time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification><staff>1</staff>')}
+      ${xn('C', 5, 2, '<voice>1</voice><time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification><staff>1</staff>')}
+      ${xn('D', 5, 6, '<tie type="start"/><voice>1</voice><staff>1</staff><notations><tied type="start"/></notations>')}
+      <backup><duration>24</duration></backup>
+      ${xn('D', 4, 24, '<voice>2</voice><staff>1</staff>')}
+      <backup><duration>24</duration></backup>
+      ${xn('G', 2, 24, '<voice>5</voice><staff>2</staff>')}
+      ${xchord('D', 3, 24, '<voice>5</voice><staff>2</staff>')}
+    </measure>
+    <measure number="2">
+      <barline location="left"><ending number="1" type="start"/></barline>
+      ${xn('D', 5, 6, '<tie type="stop"/><voice>1</voice><staff>1</staff><notations><tied type="stop"/></notations>')}
+      ${xn('C', 5, 18, '<voice>1</voice><staff>1</staff>')}
+      <backup><duration>24</duration></backup>
+      ${xn('A', 2, 24, '<voice>5</voice><staff>2</staff>')}
+      <barline location="right"><ending number="1" type="stop"/><repeat direction="backward"/></barline>
+    </measure>
+    <measure number="3">
+      <barline location="left"><ending number="2" type="start"/></barline>
+      ${xn('D', 5, 6, '<tie type="stop"/><voice>1</voice><staff>1</staff>')}
+      ${xn('G', 4, 18, '<voice>1</voice><staff>1</staff>')}
+      <backup><duration>24</duration></backup>
+      ${xn('G', 2, 24, '<voice>5</voice><staff>2</staff>')}
+      <barline location="right"><ending number="2" type="discontinue"/><bar-style>light-heavy</bar-style></barline>
+    </measure>
+  </part>
+</score-partwise>`;
+  const s = parseMusicXML(xml);
+  assert.equal(s.title, 'Chanson');
+  assert.equal(s.tempo, 96);
+  assert.equal(s.keyFifths, 1);
+  assert.equal(s.pickupBeats, 1);
+  // la partie « Voix » est ignorée : jouée : levée, m1, m2 (1re fin), m1, m3 (2e fin)
+  const R = simple(s.notes.filter((n) => n.hand === 'R')), L = simple(s.notes.filter((n) => n.hand === 'L'));
+  const third = 1 / 3;
+  const near = (a, b) => assert.ok(a.length === b.length && a.every((x, i) => x[0] === b[i][0] && Math.abs(x[1] - b[i][1]) < 1e-5 && Math.abs(x[2] - b[i][2]) < 1e-5), JSON.stringify(a));
+  near(R, [
+    [62, 3, 1, 'R'],
+    [62, 4, 4, 'R'], [67, 4, 2, 'R'], [69, 6, third, 'R'], [71, 6 + third, third, 'R'], [72, 6 + 2 * third, third, 'R'], [74, 7, 2, 'R'], // ré lié jusque dans la 1re fin
+    [72, 9, 3, 'R'],
+    [62, 12, 4, 'R'], [67, 12, 2, 'R'], [69, 14, third, 'R'], [71, 14 + third, third, 'R'], [72, 14 + 2 * third, third, 'R'], [74, 15, 2, 'R'], // lié jusque dans la 2e fin
+    [67, 17, 3, 'R'],
+  ]);
+  near(L, [[43, 4, 4, 'L'], [50, 4, 4, 'L'], [45, 8, 4, 'L'], [43, 12, 4, 'L'], [50, 12, 4, 'L'], [43, 16, 4, 'L']]);
+  assert.match(s.importReport.details.join(' | '), /reprises, fins alternatives dépliés : 4 mesures écrites → 5 jouées/);
+  assert.match(s.importReport.details.join(' | '), /plusieurs voix par portée fusionnées/);
+  assert.match(s.importReport.warnings.join(' | '), /parties ignorées : Voix/);
+  assert.deepEqual(s.dynamics.map((d) => d.mark), ['mf']);
+  assert.equal(prep(s).measureCount, 5);
+});
+
+test('musicxml : D.C. al Fine, reprise jouée 3 fois, changements de mesure et d’armure signalés', () => {
+  const m = (n, body) => `<measure number="${n}">${body}</measure>`;
+  const xml = `<score-partwise><part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list><part id="P1">
+    ${m(1, `<attributes><divisions>1</divisions><key><fifths>0</fifths></key><time><beats>2</beats><beat-type>4</beat-type></time></attributes>${xn('C', 4, 2)}`)}
+    ${m(2, `${xn('D', 4, 2)}<direction><sound fine="yes"/></direction>`)}
+    ${m(3, `<barline location="left"><repeat direction="forward"/></barline>${xn('E', 4, 2)}<barline location="right"><repeat direction="backward" times="3"/></barline>`)}
+    ${m(4, `<attributes><key><fifths>-2</fifths></key><time><beats>3</beats><beat-type>4</beat-type></time></attributes>${xn('F', 4, 3)}<direction><sound dacapo="yes"/></direction>`)}
+  </part></score-partwise>`;
+  const s = parseMusicXML(xml);
+  // do ré | mi ×3 | fa (3 temps) | D.C. : do ré, arrêt à Fine
+  assert.deepEqual(simple(s.notes).map(([mi, st, d]) => [mi, st, d]), [[60, 0, 2], [62, 2, 2], [64, 4, 2], [64, 6, 2], [64, 8, 2], [65, 10, 3], [60, 13, 2], [62, 15, 2]]);
+  assert.deepEqual(s.timeSig, [2, 4]);
+  assert.equal(s.keyFifths, 0);
+  const w = s.importReport.warnings.join(' | ');
+  assert.match(w, /1 changement de mesure/);
+  assert.match(w, /1 changement d’armure/);
+  assert.match(s.importReport.details.join(' | '), /reprises, renvois \(D\.C\., D\.S\., Coda\) dépliés : 4 mesures écrites → 8 jouées/);
+});
+
+const on = (dt, ch, key, vel = 80) => [...vlq(dt), 0x90 | ch, key, vel];
+const offEv = (dt, ch, key) => [...vlq(dt), 0x80 | ch, key, 0];
+
+test('midi (séquenceur) : format 0 à plusieurs canaux + percussions, tempo variable, notes qui se chevauchent', () => {
+  const PPQ = 480;
+  const tr = mtrk([
+    0, 0xff, 0x51, 3, 0x07, 0xa1, 0x20, // 120
+    0, 0xff, 0x58, 4, 3, 2, 24, 8, // 3/4
+    ...on(0, 0, 72), ...on(0, 1, 48), ...on(0, 9, 36), // main droite (canal 1), gauche (canal 2), grosse caisse
+    ...on(240, 0, 76), // chevauche le do (legato)
+    ...offEv(240, 0, 72), ...offEv(0, 9, 36),
+    ...vlq(0), 0xff, 0x51, 3, 0x0f, 0x42, 0x40, // 60 au 2e temps
+    ...offEv(480, 0, 76), ...on(0, 0, 79),
+    ...offEv(480, 0, 79), ...offEv(0, 1, 48),
+    0, 0xff, 0x2f, 0,
+  ]);
+  const s = parseMidi(new Uint8Array([...mthd(0, 1, PPQ), ...tr]));
+  assert.deepEqual(s.timeSig, [3, 4]);
+  assert.equal(s.tempo, 120);
+  assert.deepEqual(s.tempoMap, [{ beat: 0, bpm: 120 }, { beat: 1, bpm: 60 }]);
+  assert.deepEqual(simple(s.notes), [[48, 0, 3, 'L'], [72, 0, 1, 'R'], [76, 0.5, 1.5, 'R'], [79, 2, 1, 'R']]);
+  assert.match(s.importReport.warnings.join(' '), /Percussions \(canal 10\) ignorées/);
+  assert.match(s.importReport.details.join(' | '), /2 canaux MIDI séparés/);
+  assert.match(s.importReport.details.join(' | '), /1 changement de tempo/);
+});
+
+/** MIDI format 1 (piste de tempo + 2 pistes) à partir de notes en temps « du fichier ». */
+function midiOf(notes, { ppq = 480, bpm = 120 } = {}) {
+  const us = Math.round(60000000 / bpm);
+  const tempo = mtrk([0, 0xff, 0x51, 3, (us >> 16) & 255, (us >> 8) & 255, us & 255, 0, 0xff, 0x2f, 0]);
+  const track = (hand) => {
+    const ev = [];
+    for (const n of notes.filter((x) => x.hand === hand)) {
+      ev.push({ t: Math.round(n.start * ppq), b: [0x90, n.midi, 80] }, { t: Math.round((n.start + n.dur) * ppq), b: [0x80, n.midi, 0] });
+    }
+    ev.sort((a, b) => a.t - b.t || a.b[0] - b.b[0]);
+    const bytes = [];
+    let last = 0;
+    for (const e of ev) { bytes.push(...vlq(e.t - last), ...e.b); last = e.t; }
+    return mtrk([...bytes, 0, 0xff, 0x2f, 0]);
+  };
+  return new Uint8Array([...mthd(1, 3, ppq), ...tempo, ...track('R'), ...track('L')]);
+}
+
+test('midi joué en direct : au métronome → recalé sur la grille ; librement → tempo et mesure retrouvés', () => {
+  let seed = 11;
+  const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296) - 0.5;
+  const mel = [60, 62, 64, 65, 67, 67, 69, 69, 67, 65, 64, 62, 60, 64, 67, 72];
+  const written = [];
+  mel.forEach((m, k) => written.push({ midi: m, start: k, dur: 1, hand: 'R' }));
+  for (let b = 0; b < 16; b += 4) written.push({ midi: 48, start: b, dur: 4, hand: 'L' }, { midi: 55, start: b + 2, dur: 2, hand: 'L' });
+  // fichier propre : intact
+  const clean = parseMidi(midiOf(written));
+  assert.deepEqual(clean.importReport.details, []);
+  assert.equal(clean.notes.length, written.length);
+  // joué au métronome : ± 30 ms autour de la grille, durées approximatives
+  const loose = written.map((n) => ({ ...n, start: Math.max(0, n.start + rnd() * 0.12), dur: n.dur * (0.8 + 0.15 * rnd()) }));
+  const fixed = parseMidi(midiOf(loose));
+  assert.match(fixed.importReport.details.join(' '), /replacées sur la grille/);
+  assert.equal(fixed.tempo, 120);
+  const key = (n) => `${n.midi}@${n.start}@${n.hand}`;
+  assert.deepEqual(fixed.notes.map(key).sort(), written.map(key).sort());
+  assert.ok(fixed.notes.every((n) => Math.abs(n.dur * 4 - Math.round(n.dur * 4)) < 1e-6));
+  // joué librement à ~90 alors que le fichier dit 120 : les temps du fichier ne veulent rien dire
+  const free = written.map((n) => ({ ...n, start: 0.37 + (n.start + rnd() * 0.04) * (120 / 90), dur: n.dur * (120 / 90) * 0.9 }));
+  const s = parseMidi(midiOf(free));
+  assert.match(s.importReport.details.join(' '), /sans métronome : rythme remis au propre/);
+  assert.ok(Math.abs(s.tempo - 90) <= 2, `tempo ${s.tempo}`);
+  // 4 mesures seulement : 2/4 et 4/4 sont indiscernables (les barres tombent aux mêmes endroits une fois sur deux)
+  assert.ok(s.timeSig[1] === 4 && (s.timeSig[0] === 4 || s.timeSig[0] === 2), `mesure ${s.timeSig}`);
+  assert.deepEqual(s.notes.map(key).sort(), written.map(key).sort());
+  prep(s);
+});
+
+test('import : le compte rendu (importReport) arrive jusqu’au morceau importé', async () => {
+  const s = await importScoreText('X:1\nT:Reprise\nM:4/4\nL:1/4\nK:C\n|: C D E F :| G4 |]', 'reprise.abc');
+  assert.deepEqual(s.importReport.details, ['reprises dépliées']);
+  assert.equal(s.notes.length, 9);
 });
