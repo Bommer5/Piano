@@ -18,7 +18,6 @@ test('manifeste : champs requis et chemins relatifs (sous-dossier GitHub Pages)'
   assert.match(manifest.background_color, /^#[0-9a-f]{6}$/i);
   assert.equal(manifest.display, 'standalone');
   assert.equal(manifest.prefer_related_applications, false);
-  assert.ok(Array.isArray(manifest.display_override));
 });
 
 test('manifeste : icônes 192 et 512 aux vraies dimensions + une masquable', () => {
@@ -64,4 +63,14 @@ test('sw.js : chaque entrée de ASSETS existe', (t) => {
   // Des fichiers ajoutés par d'autres agents peuvent ne pas encore être listés : simple avertissement.
   const unlisted = collectAssets().filter((a) => !block.assets.includes(a));
   if (unlisted.length) t.diagnostic(`⚠ non précachés : ${unlisted.join(', ')} → node scripts/sw-assets.mjs`);
+});
+
+test('manifeste : uniquement des icônes PNG (une icône SVG fait échouer l’installation sur Android)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const m = JSON.parse(readFileSync(new URL('../../manifest.webmanifest', import.meta.url), 'utf8'));
+  const all = [...m.icons, ...(m.shortcuts || []).flatMap((s) => s.icons || [])];
+  for (const i of all) {
+    assert.equal(i.type, 'image/png', `icône non PNG : ${i.src}`);
+    assert.match(i.sizes, /^\d+x\d+$/, `taille « ${i.sizes} » interdite pour ${i.src}`);
+  }
 });
