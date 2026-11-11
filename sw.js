@@ -14,12 +14,13 @@
 // La liste ASSETS et VERSION (hash du contenu) sont réécrites par `node scripts/sw-assets.mjs`.
 
 // <ASSETS> (généré par scripts/sw-assets.mjs, ne pas éditer à la main)
-const VERSION = 'dd2140c09780';
+const VERSION = '5689c76d5b7f';
 const ASSETS = [
   "css/audio.css",
   "css/games.css",
   "css/harmony.css",
   "css/import.css",
+  "css/install.css",
   "css/notation.css",
   "css/profile.css",
   "css/style.css",
@@ -42,6 +43,7 @@ const ASSETS = [
   "js/core/fingering.js",
   "js/core/follower.js",
   "js/core/harmony.js",
+  "js/core/install.js",
   "js/core/micanalyser.js",
   "js/core/notation.js",
   "js/core/notes.js",
@@ -88,6 +90,7 @@ const ASSETS = [
   "js/views/home.js",
   "js/views/import.js",
   "js/views/index.js",
+  "js/views/install.js",
   "js/views/library.js",
   "js/views/notation-settings.js",
   "js/views/progress.js",

@@ -23,6 +23,7 @@
   <link rel="stylesheet" href="css/audio.css">
   <link rel="stylesheet" href="css/games.css">
   <link rel="stylesheet" href="css/import.css">
+  <link rel="stylesheet" href="css/install.css">
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -54,6 +55,7 @@
           <a href="#/accords" data-nav="accords"><span aria-hidden="true">🎹</span> Grille d’accords</a>
           <a href="#/glossaire" data-nav="glossaire"><span aria-hidden="true">📖</span> Glossaire</a>
           <a href="#/carnet" data-nav="carnet"><span aria-hidden="true">📒</span> Carnet du prof</a>
+          <a href="#/installer" data-nav="installer"><span aria-hidden="true">📲</span> Installer l’app</a>
           <a href="#/reglages" data-nav="reglages"><span aria-hidden="true">⚙️</span> Réglages</a>
           <a href="#/calibration" data-nav="calibration"><span aria-hidden="true">🎚️</span> Calibration</a>
         </div>
@@ -74,6 +76,12 @@
         '<button class="btn primary" onclick="location.reload()">Recharger</button></div>';
     };
     window.addEventListener('error', function (e) { if (!window.__booted && e.message) window.__bootFail(e.message); });
+    // Invite d'installation de Chrome : on la garde pour notre bouton « Installer » (elle peut arriver avant l'app)
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      window.__installPrompt = e;
+      window.dispatchEvent(new Event('pianocoach:installable'));
+    });
     setTimeout(function () { if (!window.__booted) window.__bootFail('Le chargement prend trop de temps (connexion lente ou fichier manquant).'); }, 15000);
   </script>
   <script type="module">

@@ -1,0 +1,26 @@
+/* Installation de l'app */
+.install-box { display: grid; gap: var(--sp-2, 8px); }
+.install-btn { width: 100%; max-width: 420px; min-height: 52px; font-size: 1.1rem; }
+.install-title { margin: 0; font-size: 1.05rem; }
+.install-steps { margin: 0; padding-left: 1.3em; display: grid; gap: 8px; line-height: 1.45; }
+.install-steps li::marker { font-weight: 800; color: var(--accent); }
+.install-ok { margin: 0; color: var(--ok); font-weight: 600; }
+.install-link { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.install-link code { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; padding: 8px 10px; border-radius: 10px; background: var(--card2); border: 1px solid var(--line); font-size: 0.85rem; }
+.install-help { display: grid; gap: 10px; padding-left: 1.2em; margin: 0; }
+.install-card { display: grid; gap: 10px; border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.install-card-head { display: flex; gap: 12px; align-items: center; }
+.install-card-head h2 { margin: 0; font-size: 1.1rem; }
+.install-card-head p { margin: 2px 0 0; }
+.install-banner {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 30; width: min(560px, calc(100vw - 16px));
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; border-radius: 14px;
+  background: var(--card); border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--line)); box-shadow: var(--shadow);
+}
+.install-banner-text { flex: 1; min-width: 0; font-weight: 600; font-size: 0.92rem; }
+.install-banner .btn { flex: none; }
+.install-banner-close { min-width: 36px; }
+/* au-dessus de la barre d'onglets sur mobile */
+@media (max-width: 760px) { .install-banner { bottom: calc(env(safe-area-inset-bottom, 0px) + 68px); } }
+@media (display-mode: standalone) { .install-banner, .install-card { display: none; } }

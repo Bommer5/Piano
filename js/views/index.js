@@ -29,6 +29,7 @@ const VIEWS = [
   ['editor.js', () => import('./editor.js')],
   ['share.js', () => import('./share.js')],
   ['notation-settings.js', () => import('./notation-settings.js')],
+  ['install.js', () => import('./install.js')],
 ];
 
 /** Vues qui n'ont pas pu être chargées : [{ file, error }]. */
